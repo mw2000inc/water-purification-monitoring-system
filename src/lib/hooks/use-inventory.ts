@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import * as api from "@/lib/api/inventory"
-import type { Product, StockMovement } from "@/lib/types"
+import type { Product, StockMovement, Supplier } from "@/lib/types"
 import { toast } from "sonner"
 
 export const productsKey = ["products"] as const
@@ -57,6 +57,18 @@ export function useDeleteProduct(actorId: string) {
       toast.success("Product deleted")
     },
     onError: () => toast.error("Failed to delete product"),
+  })
+}
+
+export function useCreateSupplier(actorId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: Omit<Supplier, "id">) => api.createSupplier(input, actorId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: suppliersKey })
+      toast.success("Supplier added successfully")
+    },
+    onError: () => toast.error("Failed to add supplier"),
   })
 }
 

@@ -4,6 +4,8 @@ import * as React from "react"
 import { z } from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
+import { useQueryClient } from "@tanstack/react-query"
+import { Truck } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -26,13 +28,17 @@ import {
   Select,
   SelectContent,
   SelectItem,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
 import { PRODUCT_CATEGORIES } from "@/lib/constants"
 import { useAuth } from "@/lib/auth/auth-context"
-import { useCreateProduct, useUpdateProduct, useSuppliers } from "@/lib/hooks/use-inventory"
+import { useCreateProduct, useUpdateProduct, useSuppliers, suppliersKey } from "@/lib/hooks/use-inventory"
+import { SupplierFormDialog } from "@/components/inventory/supplier-form-dialog"
 import type { Product } from "@/lib/types"
+
+const ADD_NEW_SUPPLIER = "__add_new_supplier__"
 
 const schema = z.object({
   name: z.string().min(2, "Product name is required"),
@@ -72,10 +78,12 @@ export function ProductFormDialog({
   product?: Product
 }) {
   const { user } = useAuth()
+  const queryClient = useQueryClient()
   const { data: suppliers = [] } = useSuppliers()
   const createProduct = useCreateProduct(user?.id ?? "")
   const updateProduct = useUpdateProduct(user?.id ?? "")
   const isEdit = !!product
+  const [newSupplierOpen, setNewSupplierOpen] = React.useState(false)
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -121,6 +129,7 @@ export function ProductFormDialog({
   )
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
@@ -175,13 +184,28 @@ export function ProductFormDialog({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Supplier</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
+                    <Select
+                      value={field.value}
+                      onValueChange={(v) => {
+                        if (v === ADD_NEW_SUPPLIER) {
+                          setNewSupplierOpen(true)
+                          return
+                        }
+                        field.onChange(v)
+                      }}
+                    >
                       <FormControl>
                         <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Select supplier" />
+                          <SelectValue placeholder="Select supplier">
+                            {suppliers.find((s) => s.id === field.value)?.name}
+                          </SelectValue>
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
+                        <SelectItem value={ADD_NEW_SUPPLIER} className="text-primary font-medium">
+                          <Truck className="h-4 w-4" /> Add New Supplier
+                        </SelectItem>
+                        <SelectSeparator />
                         {suppliers.map((s) => (
                           <SelectItem key={s.id} value={s.id}>
                             {s.name}
@@ -236,5 +260,19 @@ export function ProductFormDialog({
         </Form>
       </DialogContent>
     </Dialog>
+    <SupplierFormDialog
+      open={newSupplierOpen}
+      onOpenChange={setNewSupplierOpen}
+      onCreated={(supplier) => {
+        // Same deferred-setValue trick as the Sale form's inline "Add New Customer":
+        // Radix's hidden native <select> needs its new <option> committed to the DOM
+        // before the controlled value can point at it.
+        queryClient.setQueryData(suppliersKey, (old: typeof suppliers = []) => [supplier, ...old])
+        setTimeout(() => {
+          form.setValue("supplierId", supplier.id, { shouldValidate: true })
+        }, 0)
+      }}
+    />
+    </>
   )
 }

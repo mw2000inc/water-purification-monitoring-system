@@ -27,6 +27,10 @@ export async function listSuppliers(): Promise<Supplier[]> {
   return delay([...store.state.suppliers])
 }
 
+export async function createSupplier(input: Omit<Supplier, "id">, actorId: string): Promise<Supplier> {
+  return delay(store.addSupplier(input, actorId))
+}
+
 export async function listStockMovements(): Promise<StockMovement[]> {
   return delay([...store.state.stockMovements])
 }

@@ -50,7 +50,7 @@ export default function LoginPage() {
   const { login, user, loading } = useAuth()
   const router = useRouter()
   const queryClient = useQueryClient()
-  const [mode, setMode] = React.useState<Mode>("signin")
+  const [mode, setMode] = React.useState<Mode>("signup")
 
   React.useEffect(() => {
     if (!loading && user) router.replace("/")
@@ -67,25 +67,26 @@ export default function LoginPage() {
   })
 
   function onSignIn(values: z.infer<typeof signInSchema>) {
-    const found = store.state.users.find(
-      (u) => u.email.toLowerCase() === values.email.toLowerCase()
-    )
+    const email = values.email.trim().toLowerCase()
+    const found = store.state.users.find((u) => u.email.trim().toLowerCase() === email)
     if (!found) {
-      toast.error("No account found with that email in this demo. Try one of the quick logins below.")
+      toast.error("No account found with that email. Sign up to create one.")
       return
     }
     login(found.id)
   }
 
   async function onSignUp(values: z.infer<typeof signUpSchema>) {
-    const existing = store.state.users.find(
-      (u) => u.email.toLowerCase() === values.email.toLowerCase()
-    )
+    const email = values.email.trim().toLowerCase()
+    const existing = store.state.users.find((u) => u.email.trim().toLowerCase() === email)
     if (existing) {
       signUpForm.setError("email", { message: "An account with this email already exists." })
       return
     }
-    const created = await createUser({ name: values.name, email: values.email, role: values.role }, "self-signup")
+    const created = await createUser(
+      { name: values.name.trim(), email: values.email.trim(), role: values.role },
+      "self-signup"
+    )
     queryClient.invalidateQueries({ queryKey: usersKey })
     toast.success("Account created! Welcome to MW2000.")
     login(created.id)
@@ -122,7 +123,7 @@ export default function LoginPage() {
                       <FormItem>
                         <FormLabel>Email</FormLabel>
                         <FormControl>
-                          <Input placeholder="admin@aquatrack.ph" {...field} />
+                          <Input placeholder="you@yourcompany.com" autoComplete="email" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -135,7 +136,7 @@ export default function LoginPage() {
                       <FormItem>
                         <FormLabel>Password</FormLabel>
                         <FormControl>
-                          <Input type="password" placeholder="••••••••" {...field} />
+                          <Input type="password" placeholder="••••••••" autoComplete="current-password" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -156,7 +157,7 @@ export default function LoginPage() {
                       <FormItem>
                         <FormLabel>Full Name</FormLabel>
                         <FormControl>
-                          <Input placeholder="Juan Dela Cruz" {...field} />
+                          <Input placeholder="Juan Dela Cruz" autoComplete="name" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -169,7 +170,7 @@ export default function LoginPage() {
                       <FormItem>
                         <FormLabel>Work Email</FormLabel>
                         <FormControl>
-                          <Input placeholder="you@aquatrack.ph" {...field} />
+                          <Input placeholder="you@yourcompany.com" autoComplete="email" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -182,7 +183,7 @@ export default function LoginPage() {
                       <FormItem>
                         <FormLabel>Password</FormLabel>
                         <FormControl>
-                          <Input type="password" placeholder="••••••••" {...field} />
+                          <Input type="password" placeholder="••••••••" autoComplete="new-password" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -195,7 +196,7 @@ export default function LoginPage() {
                       <FormItem>
                         <FormLabel>Confirm Password</FormLabel>
                         <FormControl>
-                          <Input type="password" placeholder="••••••••" {...field} />
+                          <Input type="password" placeholder="••••••••" autoComplete="new-password" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -267,30 +268,6 @@ export default function LoginPage() {
                 </button>
               )}
             </div>
-
-            {mode === "signin" && (
-              <>
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t" />
-                  </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-card px-2 text-muted-foreground">Or try a demo account</span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <Button variant="outline" className="flex-col h-auto py-3 gap-1" onClick={() => login("usr-001")}>
-                    <ShieldCheck className="h-4 w-4 text-primary" />
-                    <span className="text-xs">Admin</span>
-                  </Button>
-                  <Button variant="outline" className="flex-col h-auto py-3 gap-1" onClick={() => login("usr-002")}>
-                    <UserRound className="h-4 w-4 text-secondary" />
-                    <span className="text-xs">Staff</span>
-                  </Button>
-                </div>
-              </>
-            )}
           </CardContent>
         </Card>
       </div>
