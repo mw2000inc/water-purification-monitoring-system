@@ -25,6 +25,7 @@ export interface Customer {
   contactNumber: string
   dispenserType: string
   filterInstalled: boolean
+  installedDate?: string
   assignedTechnician: string
   notes?: string
   createdAt: string

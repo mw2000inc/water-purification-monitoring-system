@@ -9,16 +9,14 @@ import {
   Phone,
   Pencil,
   Wrench,
-  Droplet,
-  FileText,
-  Receipt,
-  Package,
+  CalendarDays,
   Building2,
   QrCode,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Input } from "@/components/ui/input"
 import {
   Select,
   SelectContent,
@@ -29,15 +27,13 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Skeleton } from "@/components/ui/skeleton"
-import { ContractStatusBadge, PaymentStatusBadge } from "@/components/shared/status-badge"
+import { ContractStatusBadge } from "@/components/shared/status-badge"
 import { CustomerFormDialog } from "@/components/customers/customer-form-dialog"
 import { CustomerQrDialog } from "@/components/customers/customer-qr-dialog"
 import { useCustomer, useUpdateCustomer } from "@/lib/hooks/use-customers"
-import { useSales } from "@/lib/hooks/use-sales"
-import { useProducts } from "@/lib/hooks/use-inventory"
 import { useSettings } from "@/lib/hooks/use-misc"
 import { useAuth } from "@/lib/auth/auth-context"
-import { formatCurrency, formatDate, getContractStatus, initials, daysUntil } from "@/lib/utils"
+import { formatDate, getContractStatus, initials } from "@/lib/utils"
 import { getServiceHistory } from "@/lib/service-history"
 import { TECHNICIANS } from "@/lib/constants"
 
@@ -48,14 +44,14 @@ export default function CustomerProfilePage() {
   const router = useRouter()
   const { user } = useAuth()
   const { data: customer, isPending } = useCustomer(params.id)
-  const { data: sales = [] } = useSales()
-  const { data: products = [] } = useProducts()
   const { data: settings } = useSettings()
   const updateCustomer = useUpdateCustomer(user?.id ?? "")
   const [editOpen, setEditOpen] = React.useState(false)
   const [qrOpen, setQrOpen] = React.useState(false)
   const [technicianOpen, setTechnicianOpen] = React.useState(false)
   const [technicianDraft, setTechnicianDraft] = React.useState(TECHNICIAN_NA)
+  const [installedDateOpen, setInstalledDateOpen] = React.useState(false)
+  const [installedDateDraft, setInstalledDateDraft] = React.useState("")
   const isAdmin = user?.role === "admin"
 
   if (isPending) {
@@ -79,24 +75,7 @@ export default function CustomerProfilePage() {
   }
 
   const status = getContractStatus(customer.contractEnd)
-  const customerSales = sales.filter((s) => s.customerId === customer.id)
   const serviceHistory = getServiceHistory(customer)
-  const installedProducts = new Map<string, { name: string; qty: number; lastPurchased: string }>()
-  customerSales.forEach((s) => {
-    s.items.forEach((it) => {
-      const product = products.find((p) => p.id === it.productId)
-      if (!product) return
-      const existing = installedProducts.get(product.id)
-      if (existing) {
-        existing.qty += it.quantity
-        if (s.date > existing.lastPurchased) existing.lastPurchased = s.date
-      } else {
-        installedProducts.set(product.id, { name: product.name, qty: it.quantity, lastPurchased: s.date })
-      }
-    })
-  })
-
-  const daysLeft = daysUntil(customer.contractEnd)
 
   return (
     <div className="space-y-6">
@@ -136,10 +115,7 @@ export default function CustomerProfilePage() {
       <Tabs defaultValue="personal">
         <TabsList className="flex-wrap h-auto group-data-horizontal/tabs:h-auto">
           <TabsTrigger value="personal">Personal Info</TabsTrigger>
-          <TabsTrigger value="contract">Contract Details</TabsTrigger>
           <TabsTrigger value="service">Service History</TabsTrigger>
-          <TabsTrigger value="payments">Payment History</TabsTrigger>
-          <TabsTrigger value="products">Installed Products</TabsTrigger>
         </TabsList>
 
         <div className="flex flex-wrap gap-2">
@@ -211,6 +187,51 @@ export default function CustomerProfilePage() {
               )}
             </PopoverContent>
           </Popover>
+          <Popover
+            open={installedDateOpen}
+            onOpenChange={(open) => {
+              setInstalledDateOpen(open)
+              if (open) setInstalledDateDraft(customer.installedDate ?? "")
+            }}
+          >
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-1.5">
+                <CalendarDays className="h-4 w-4" /> Installed Date
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-64" align="start">
+              <p className="text-sm font-semibold mb-3">Installed Date</p>
+              {isAdmin ? (
+                <div className="space-y-3">
+                  <Input
+                    type="date"
+                    value={installedDateDraft}
+                    onChange={(e) => setInstalledDateDraft(e.target.value)}
+                  />
+                  <Button
+                    size="sm"
+                    className="w-full"
+                    disabled={updateCustomer.isPending}
+                    onClick={async () => {
+                      await updateCustomer.mutateAsync({
+                        id: customer.id,
+                        input: { installedDate: installedDateDraft || undefined },
+                      })
+                      setInstalledDateOpen(false)
+                    }}
+                  >
+                    {updateCustomer.isPending ? "Saving..." : "Save"}
+                  </Button>
+                </div>
+              ) : (
+                <InfoRow
+                  icon={CalendarDays}
+                  label="Date"
+                  value={customer.installedDate ? formatDate(customer.installedDate) : "N/A"}
+                />
+              )}
+            </PopoverContent>
+          </Popover>
         </div>
 
         <TabsContent value="personal">
@@ -222,32 +243,7 @@ export default function CustomerProfilePage() {
               <InfoRow icon={Mail} label="Email Address" value={customer.email} />
               <InfoRow icon={Phone} label="Contact Number" value={customer.contactNumber} />
               <InfoRow icon={MapPin} label="Address" value={customer.address} className="sm:col-span-2" />
-              <InfoRow icon={Droplet} label="Water Dispenser Type" value={customer.dispenserType} />
-              <InfoRow
-                icon={Droplet}
-                label="Water Filter Installed"
-                value={customer.filterInstalled ? "Yes" : "No"}
-              />
               <InfoRow icon={Wrench} label="Assigned Technician" value={customer.assignedTechnician || "N/A"} />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="contract">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Contract Details</CardTitle>
-            </CardHeader>
-            <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-              <InfoRow icon={FileText} label="Contract Number" value={customer.contractNumber} />
-              <InfoRow icon={FileText} label="Status" value={<ContractStatusBadge status={status} />} />
-              <InfoRow icon={FileText} label="Contract Start" value={formatDate(customer.contractStart)} />
-              <InfoRow icon={FileText} label="Contract End" value={formatDate(customer.contractEnd)} />
-              <InfoRow
-                icon={FileText}
-                label="Time Remaining"
-                value={daysLeft >= 0 ? `${daysLeft} day(s) left` : `Expired ${Math.abs(daysLeft)} day(s) ago`}
-              />
             </CardContent>
           </Card>
         </TabsContent>
@@ -275,71 +271,6 @@ export default function CustomerProfilePage() {
                   </div>
                 </div>
               ))}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="payments">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Payment History</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {customerSales.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No sales recorded for this customer yet.</p>
-              ) : (
-                <div className="space-y-3">
-                  {customerSales.map((s) => (
-                    <div key={s.id} className="flex items-center justify-between border-b pb-3 last:border-0 last:pb-0">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-secondary/10 text-secondary">
-                          <Receipt className="h-4 w-4" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium">{s.invoiceNumber}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {formatDate(s.date)} &middot; {s.paymentMethod}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-semibold">{formatCurrency(s.totalAmount)}</p>
-                        <PaymentStatusBadge status={s.paymentStatus} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="products">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Installed Products</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {installedProducts.size === 0 ? (
-                <p className="text-sm text-muted-foreground">No products purchased/installed yet.</p>
-              ) : (
-                <div className="space-y-3">
-                  {Array.from(installedProducts.values()).map((p, i) => (
-                    <div key={i} className="flex items-center justify-between border-b pb-3 last:border-0 last:pb-0">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-success/10 text-success">
-                          <Package className="h-4 w-4" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium">{p.name}</p>
-                          <p className="text-xs text-muted-foreground">Last purchased {formatDate(p.lastPurchased)}</p>
-                        </div>
-                      </div>
-                      <span className="text-sm font-semibold">x{p.qty}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
             </CardContent>
           </Card>
         </TabsContent>

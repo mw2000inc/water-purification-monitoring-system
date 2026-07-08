@@ -103,6 +103,7 @@ export const CUSTOMERS: Customer[] = Array.from({ length: 48 }).map((_, i) => {
     contactNumber: `09${int(150000000, 999999999)}`,
     dispenserType: pick(DISPENSER_TYPES),
     filterInstalled: rand() < 0.78,
+    installedDate: iso(contractStart),
     assignedTechnician: pick(TECHNICIANS),
     notes: rand() < 0.25 ? pick([
       "Prefers morning maintenance visits.",
@@ -189,19 +190,69 @@ SALES.forEach((sale) => {
     })
   })
 })
-// Historic restocks
+// Historic restocks + an opening-stock entry per product. The opening amount is
+// sized so the running total never dips negative even while sales are drawing
+// down ahead of a later restock, and a final adjustment (if any gap remains)
+// reconciles the ledger to exactly match the product's current stockQuantity.
 PRODUCTS.forEach((p) => {
-  const restocks = int(2, 4)
-  for (let i = 0; i < restocks; i++) {
+  const salesForProduct = STOCK_MOVEMENTS.filter((m) => m.productId === p.id && m.reason === "Sale")
+
+  const restockCount = int(2, 4)
+  const restocks = Array.from({ length: restockCount }, () => ({
+    date: subDays(NOW, int(15, 170)),
+    quantity: int(20, 80),
+  }))
+
+  const events = [
+    ...salesForProduct.map((m) => ({ date: m.date, delta: -m.quantityRemoved })),
+    ...restocks.map((r) => ({ date: iso(r.date), delta: r.quantity })),
+  ].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
+
+  const MIN_OPENING = 15
+  let running = 0
+  let minRunning = 0
+  for (const e of events) {
+    running += e.delta
+    if (running < minRunning) minRunning = running
+  }
+  const opening = Math.max(MIN_OPENING, MIN_OPENING - minRunning)
+  const totalDelta = events.reduce((sum, e) => sum + e.delta, 0)
+  const adjustment = p.stockQuantity - (opening + totalDelta)
+
+  STOCK_MOVEMENTS.push({
+    id: generateId("mov"),
+    date: p.dateAdded,
+    productId: p.id,
+    quantityAdded: opening,
+    quantityRemoved: 0,
+    reason: "Restock",
+    userId: pick(USERS.filter((u) => u.role === "admin")).id,
+    referenceNumber: `PO-${int(10000, 99999)}`,
+  })
+
+  restocks.forEach((r) => {
     STOCK_MOVEMENTS.push({
       id: generateId("mov"),
-      date: iso(subDays(NOW, int(15, 170))),
+      date: iso(r.date),
       productId: p.id,
-      quantityAdded: int(20, 80),
+      quantityAdded: r.quantity,
       quantityRemoved: 0,
       reason: "Restock",
       userId: pick(USERS.filter((u) => u.role === "admin")).id,
       referenceNumber: `PO-${int(10000, 99999)}`,
+    })
+  })
+
+  if (adjustment !== 0) {
+    STOCK_MOVEMENTS.push({
+      id: generateId("mov"),
+      date: iso(NOW),
+      productId: p.id,
+      quantityAdded: adjustment > 0 ? adjustment : 0,
+      quantityRemoved: adjustment < 0 ? -adjustment : 0,
+      reason: "Adjustment",
+      userId: pick(USERS.filter((u) => u.role === "admin")).id,
+      referenceNumber: `ADJ-${int(1000, 9999)}`,
     })
   }
 })

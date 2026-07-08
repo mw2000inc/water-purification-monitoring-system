@@ -51,6 +51,10 @@ export const stockMovementsColumns: ColumnDef<StockMovementRow, unknown>[] = [
       ),
   },
   {
+    accessorKey: "reason",
+    header: "Reason",
+  },
+  {
     accessorKey: "userName",
     header: "User",
   },

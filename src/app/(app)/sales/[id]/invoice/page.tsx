@@ -1,10 +1,11 @@
 "use client"
 
 import { useParams, useRouter } from "next/navigation"
-import { ArrowLeft, Droplets, Printer } from "lucide-react"
+import { ArrowLeft, Printer } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Logo } from "@/components/shared/logo"
 import { PaymentStatusBadge } from "@/components/shared/status-badge"
 import { useSale } from "@/lib/hooks/use-sales"
 import { useCustomers } from "@/lib/hooks/use-customers"
@@ -63,9 +64,7 @@ export default function InvoicePage() {
         <CardContent className="p-8 space-y-8">
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-2">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                <Droplets className="h-5 w-5" />
-              </div>
+              <Logo className="h-10 w-10 shrink-0" />
               <div>
                 <p className="font-semibold">{settings?.companyName}</p>
                 <p className="text-xs text-muted-foreground">{settings?.supportEmail}</p>

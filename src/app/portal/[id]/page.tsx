@@ -3,7 +3,6 @@
 import * as React from "react"
 import { useParams } from "next/navigation"
 import {
-  Droplets,
   Mail,
   MapPin,
   Phone,
@@ -20,6 +19,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ContractStatusBadge, PaymentStatusBadge } from "@/components/shared/status-badge"
+import { Logo } from "@/components/shared/logo"
 import { useCustomer } from "@/lib/hooks/use-customers"
 import { useSales } from "@/lib/hooks/use-sales"
 import { useProducts } from "@/lib/hooks/use-inventory"
@@ -98,7 +98,7 @@ export default function CustomerPortalPage() {
           <CardContent className="flex items-start gap-3 py-4">
             <ShieldCheck className="h-4 w-4 text-success shrink-0 mt-0.5" />
             <p className="text-xs text-muted-foreground">
-              This is a read-only view of your account. Only AquaTrack staff can make changes — contact us below if
+              This is a read-only view of your account. Only MW2000 staff can make changes — contact us below if
               anything needs updating.
             </p>
           </CardContent>
@@ -269,11 +269,9 @@ export default function CustomerPortalPage() {
     <div className="min-h-screen bg-background">
       <header className="border-b">
         <div className="max-w-2xl mx-auto flex items-center gap-2 px-4 py-4">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <Droplets className="h-5 w-5" />
-          </div>
+          <Logo className="h-9 w-9 shrink-0" />
           <div className="leading-tight">
-            <p className="font-semibold text-sm">{settings?.companyName ?? "AquaTrack"}</p>
+            <p className="font-semibold text-sm">{settings?.companyName ?? "MW2000"}</p>
             <p className="text-xs text-muted-foreground">Customer Profile</p>
           </div>
         </div>

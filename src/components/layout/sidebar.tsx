@@ -2,10 +2,10 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Droplets } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { NAV_ITEMS } from "@/components/layout/nav-items"
 import { useAuth } from "@/lib/auth/auth-context"
+import { Logo } from "@/components/shared/logo"
 
 export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname()
@@ -16,11 +16,9 @@ export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-2 px-5 py-5">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-          <Droplets className="h-5 w-5" />
-        </div>
+        <Logo className="h-9 w-9 shrink-0" />
         <div className="flex flex-col leading-tight">
-          <span className="font-semibold text-sm">AquaTrack</span>
+          <span className="font-semibold text-sm">MW2000</span>
           <span className="text-xs text-muted-foreground">Water Purification ERP</span>
         </div>
       </div>
@@ -47,7 +45,7 @@ export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
         })}
       </nav>
       <div className="px-5 py-4 text-xs text-muted-foreground border-t">
-        &copy; {new Date().getFullYear()} AquaTrack Inc.
+        &copy; {new Date().getFullYear()} MW2000 Inc.
       </div>
     </div>
   )

@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AquaTrack — Customer, Sales & Inventory Management",
+  title: "MW2000 — Customer, Sales & Inventory Management",
   description: "Monitoring and management system for a water purification company",
 };
 

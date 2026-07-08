@@ -12,7 +12,7 @@ import { useContracts } from "@/lib/hooks/use-contracts"
 import { useCustomers } from "@/lib/hooks/use-customers"
 import { daysUntil, getNextQuarterlyDate } from "@/lib/utils"
 import type { MonitoringStatus } from "@/lib/types"
-import { format, parseISO } from "date-fns"
+import { format, parseISO, subMonths } from "date-fns"
 
 type StatusTab = "all" | MonitoringStatus
 
@@ -28,10 +28,16 @@ export default function ContractsPage() {
   const rows: ContractRow[] = React.useMemo(() => {
     return contracts.map((c) => {
       const customer = customers.find((cust) => cust.id === c.customerId)
-      const nextEndDate = format(getNextQuarterlyDate(c.startDate), "yyyy-MM-dd")
+      // The current quarterly cycle: end is the next checkpoint on/after today,
+      // start is exactly 3 months before that, so the two always stay 3 months apart.
+      const periodEnd = getNextQuarterlyDate(c.startDate)
+      const periodStart = subMonths(periodEnd, 3)
+      const nextEndDate = format(periodEnd, "yyyy-MM-dd")
+      const startDate = format(periodStart, "yyyy-MM-dd")
       const daysRemaining = daysUntil(nextEndDate)
       return {
         ...c,
+        startDate,
         orderNumber: customer?.orderNumber ?? "N/A",
         customerName: customer?.fullName ?? "Unknown",
         companyName: customer?.companyName,

@@ -16,11 +16,12 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { DataTable } from "@/components/data-table/data-table"
 import { MonthYearFilter, type MonthYearValue } from "@/components/data-table/month-year-filter"
 import { ConfirmDialog } from "@/components/shared/confirm-dialog"
+import { ExportButtons } from "@/components/shared/export-buttons"
 import { ProductFormDialog } from "@/components/inventory/product-form-dialog"
 import { getInventoryColumns, type ProductRow } from "@/components/inventory/inventory-columns"
 import { useDeleteProduct, useProducts, useSuppliers } from "@/lib/hooks/use-inventory"
 import { useAuth } from "@/lib/auth/auth-context"
-import { getStockStatus } from "@/lib/utils"
+import { formatDate, getStockStatus } from "@/lib/utils"
 import { PRODUCT_CATEGORIES } from "@/lib/constants"
 import type { Product, StockStatus } from "@/lib/types"
 
@@ -29,6 +30,7 @@ export default function InventoryPage() {
   const { data: products = [], isPending: p1 } = useProducts()
   const { data: suppliers = [], isPending: p2 } = useSuppliers()
   const deleteProduct = useDeleteProduct(user?.id ?? "")
+  const isAdmin = user?.role === "admin"
 
   const [categoryFilter, setCategoryFilter] = React.useState<string>("all")
   const [statusFilter, setStatusFilter] = React.useState<"all" | StockStatus>("all")
@@ -36,6 +38,7 @@ export default function InventoryPage() {
   const [formOpen, setFormOpen] = React.useState(false)
   const [editing, setEditing] = React.useState<Product | undefined>(undefined)
   const [deleting, setDeleting] = React.useState<Product | undefined>(undefined)
+  const [filteredRows, setFilteredRows] = React.useState<ProductRow[]>([])
 
   const isPending = p1 || p2
 
@@ -80,6 +83,18 @@ export default function InventoryPage() {
     [can, user?.role]
   )
 
+  const exportColumns = [
+    { header: "SKU", key: "sku" },
+    { header: "Product Name", key: "name" },
+    { header: "Category", key: "category" },
+    { header: "Supplier", key: "supplierName" },
+    { header: "Stock Qty", key: "stockQuantity" },
+    { header: "Min Level", key: "minStockLevel" },
+    { header: "Status", key: "stockStatus" },
+    ...(isAdmin ? [{ header: "Purchase Price", key: "purchasePrice" }] : []),
+    { header: "Selling Price", key: "sellingPrice" },
+  ]
+
   if (isPending) {
     return (
       <div className="space-y-4">
@@ -117,6 +132,7 @@ export default function InventoryPage() {
             columns={columns}
             data={scopedRows}
             searchPlaceholder="Search by name, SKU, barcode..."
+            onFilteredRowsChange={setFilteredRows}
             emptyMessage="No products found."
             toolbar={
               <>
@@ -145,6 +161,13 @@ export default function InventoryPage() {
                   </SelectContent>
                 </Select>
                 <MonthYearFilter value={monthYear} onChange={setMonthYear} years={years} />
+                <ExportButtons
+                  title="Inventory Report"
+                  subtitle={`Generated ${formatDate(new Date().toISOString())}`}
+                  fileName="inventory"
+                  columns={exportColumns}
+                  rows={filteredRows}
+                />
               </>
             }
           />

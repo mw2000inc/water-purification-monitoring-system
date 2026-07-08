@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth/auth-context"
 import { SidebarNav } from "@/components/layout/sidebar"
 import { Topbar } from "@/components/layout/topbar"
-import { Droplets } from "lucide-react"
+import { Logo } from "@/components/shared/logo"
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
@@ -19,8 +19,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3 text-muted-foreground">
-          <Droplets className="h-8 w-8 text-primary animate-pulse" />
-          <span className="text-sm">Loading AquaTrack...</span>
+          <Logo className="h-8 w-8 animate-pulse" />
+          <span className="text-sm">Loading MW2000...</span>
         </div>
       </div>
     )

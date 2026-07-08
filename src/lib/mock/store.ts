@@ -40,7 +40,7 @@ const STORAGE_KEY = "aquatrack-db-v1"
 
 function defaultSettings(): CompanySettings {
   return {
-    companyName: "AquaTrack Water Purification Co.",
+    companyName: "MW2000 Water Purification Co.",
     companyLogoUrl: undefined,
     supportEmail: "support@aquatrack.ph",
     emailNotificationsEnabled: true,

@@ -38,20 +38,48 @@ export default function StockMovementsPage() {
 
   const isPending = p1 || p2 || p3
 
-  const rows: StockMovementRow[] = React.useMemo(
-    () =>
-      movements.map((m) => {
-        const product = products.find((p) => p.id === m.productId)
-        return {
-          ...m,
-          productName: product?.name ?? "Unknown",
-          sku: product?.sku ?? "-",
-          actualStock: product?.stockQuantity ?? 0,
-          userName: users.find((u) => u.id === m.userId)?.name ?? "Unknown",
-        }
-      }),
-    [movements, products, users]
-  )
+  const rows: StockMovementRow[] = React.useMemo(() => {
+    // Movements are stored newest-created-first; group per product so we can walk
+    // each product's own history chronologically and rebuild the stock level as it
+    // was on each date, rather than stamping every row with today's live quantity.
+    const byProduct = new Map<string, { movement: (typeof movements)[number]; index: number }[]>()
+    movements.forEach((m, index) => {
+      const list = byProduct.get(m.productId) ?? []
+      list.push({ movement: m, index })
+      byProduct.set(m.productId, list)
+    })
+
+    const actualStockByMovementId = new Map<string, number>()
+    byProduct.forEach((entries, productId) => {
+      const product = products.find((p) => p.id === productId)
+      const netTotal = entries.reduce((sum, e) => sum + e.movement.quantityAdded - e.movement.quantityRemoved, 0)
+      const currentStock = product?.stockQuantity ?? netTotal
+      const opening = currentStock - netTotal
+
+      const chronological = [...entries].sort((a, b) => {
+        const dateDiff = a.movement.date.localeCompare(b.movement.date)
+        if (dateDiff !== 0) return dateDiff
+        return b.index - a.index // higher original index = created earlier = comes first
+      })
+
+      let running = opening
+      for (const entry of chronological) {
+        running += entry.movement.quantityAdded - entry.movement.quantityRemoved
+        actualStockByMovementId.set(entry.movement.id, running)
+      }
+    })
+
+    return movements.map((m) => {
+      const product = products.find((p) => p.id === m.productId)
+      return {
+        ...m,
+        productName: product?.name ?? "Unknown",
+        sku: product?.sku ?? "-",
+        actualStock: actualStockByMovementId.get(m.id) ?? product?.stockQuantity ?? 0,
+        userName: users.find((u) => u.id === m.userId)?.name ?? "Unknown",
+      }
+    })
+  }, [movements, products, users])
 
   const scopedRows = React.useMemo(() => {
     return rows.filter((r) => {
@@ -138,7 +166,7 @@ export default function StockMovementsPage() {
           <DataTable
             columns={stockMovementsColumns}
             data={scopedRows}
-            searchPlaceholder="Search by reference number..."
+            searchPlaceholder="Search by SKU, product name, or date..."
             emptyMessage="No stock movements found."
             toolbar={
               <>
