@@ -1,0 +1,170 @@
+"use client"
+
+import * as React from "react"
+import { parseISO } from "date-fns"
+import { Package, Plus } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Card, CardContent } from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
+import { DataTable } from "@/components/data-table/data-table"
+import { MonthYearFilter, type MonthYearValue } from "@/components/data-table/month-year-filter"
+import { ConfirmDialog } from "@/components/shared/confirm-dialog"
+import { ProductFormDialog } from "@/components/inventory/product-form-dialog"
+import { getInventoryColumns, type ProductRow } from "@/components/inventory/inventory-columns"
+import { useDeleteProduct, useProducts, useSuppliers } from "@/lib/hooks/use-inventory"
+import { useAuth } from "@/lib/auth/auth-context"
+import { getStockStatus } from "@/lib/utils"
+import { PRODUCT_CATEGORIES } from "@/lib/constants"
+import type { Product, StockStatus } from "@/lib/types"
+
+export default function InventoryPage() {
+  const { user, can } = useAuth()
+  const { data: products = [], isPending: p1 } = useProducts()
+  const { data: suppliers = [], isPending: p2 } = useSuppliers()
+  const deleteProduct = useDeleteProduct(user?.id ?? "")
+
+  const [categoryFilter, setCategoryFilter] = React.useState<string>("all")
+  const [statusFilter, setStatusFilter] = React.useState<"all" | StockStatus>("all")
+  const [monthYear, setMonthYear] = React.useState<MonthYearValue>({ month: "all", year: "all" })
+  const [formOpen, setFormOpen] = React.useState(false)
+  const [editing, setEditing] = React.useState<Product | undefined>(undefined)
+  const [deleting, setDeleting] = React.useState<Product | undefined>(undefined)
+
+  const isPending = p1 || p2
+
+  const rows: ProductRow[] = React.useMemo(
+    () =>
+      products.map((p) => ({
+        ...p,
+        stockStatus: getStockStatus(p.stockQuantity, p.minStockLevel),
+        supplierName: suppliers.find((s) => s.id === p.supplierId)?.name ?? "Unknown",
+      })),
+    [products, suppliers]
+  )
+
+  const years = React.useMemo(
+    () => Array.from(new Set(products.map((p) => parseISO(p.dateAdded).getFullYear()))).sort((a, b) => b - a),
+    [products]
+  )
+
+  const scopedRows = React.useMemo(() => {
+    return rows.filter((r) => {
+      if (categoryFilter !== "all" && r.category !== categoryFilter) return false
+      if (statusFilter !== "all" && r.stockStatus !== statusFilter) return false
+      const d = parseISO(r.dateAdded)
+      if (monthYear.month !== "all" && d.getMonth() !== Number(monthYear.month)) return false
+      if (monthYear.year !== "all" && d.getFullYear() !== Number(monthYear.year)) return false
+      return true
+    })
+  }, [rows, categoryFilter, statusFilter, monthYear])
+
+  const columns = React.useMemo(
+    () =>
+      getInventoryColumns({
+        isAdmin: user?.role === "admin",
+        canEdit: can("inventory:edit"),
+        canDelete: can("inventory:delete"),
+        onEdit: (p) => {
+          setEditing(p)
+          setFormOpen(true)
+        },
+        onDelete: (p) => setDeleting(p),
+      }),
+    [can, user?.role]
+  )
+
+  if (isPending) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-10 w-64" />
+        <Skeleton className="h-96 w-full" />
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
+            <Package className="h-6 w-6 text-primary" /> Inventory
+          </h1>
+          <p className="text-sm text-muted-foreground">Track stock levels, pricing and suppliers.</p>
+        </div>
+        {can("inventory:add") && (
+          <Button
+            onClick={() => {
+              setEditing(undefined)
+              setFormOpen(true)
+            }}
+            className="gap-1.5"
+          >
+            <Plus className="h-4 w-4" /> Add Product
+          </Button>
+        )}
+      </div>
+
+      <Card>
+        <CardContent className="pt-6">
+          <DataTable
+            columns={columns}
+            data={scopedRows}
+            searchPlaceholder="Search by name, SKU, barcode..."
+            emptyMessage="No products found."
+            toolbar={
+              <>
+                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                  <SelectTrigger className="h-9 w-[150px]">
+                    <SelectValue placeholder="Category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Categories</SelectItem>
+                    {PRODUCT_CATEGORIES.map((c) => (
+                      <SelectItem key={c} value={c}>
+                        {c}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}>
+                  <SelectTrigger className="h-9 w-[150px]">
+                    <SelectValue placeholder="Stock Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    <SelectItem value="in-stock">In Stock</SelectItem>
+                    <SelectItem value="low-stock">Low Stock</SelectItem>
+                    <SelectItem value="out-of-stock">Out of Stock</SelectItem>
+                  </SelectContent>
+                </Select>
+                <MonthYearFilter value={monthYear} onChange={setMonthYear} years={years} />
+              </>
+            }
+          />
+        </CardContent>
+      </Card>
+
+      <ProductFormDialog open={formOpen} onOpenChange={setFormOpen} product={editing} />
+
+      <ConfirmDialog
+        open={!!deleting}
+        onOpenChange={(o) => !o && setDeleting(undefined)}
+        title="Delete product?"
+        description={`This will permanently remove ${deleting?.name ?? "this product"} from inventory.`}
+        loading={deleteProduct.isPending}
+        onConfirm={async () => {
+          if (!deleting) return
+          await deleteProduct.mutateAsync(deleting.id)
+          setDeleting(undefined)
+        }}
+      />
+    </div>
+  )
+}

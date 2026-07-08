@@ -1,0 +1,26 @@
+"use client"
+
+import * as React from "react"
+import { useRouter } from "next/navigation"
+import { ShieldAlert } from "lucide-react"
+import { useAuth } from "@/lib/auth/auth-context"
+
+export function AdminGuard({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth()
+  const router = useRouter()
+
+  React.useEffect(() => {
+    if (!loading && user && user.role !== "admin") router.replace("/")
+  }, [loading, user, router])
+
+  if (loading || !user || user.role !== "admin") {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 gap-3 text-center text-muted-foreground">
+        <ShieldAlert className="h-8 w-8" />
+        <p className="text-sm">Checking access...</p>
+      </div>
+    )
+  }
+
+  return <>{children}</>
+}

@@ -1,0 +1,62 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import * as api from "@/lib/api/customers"
+import type { Customer } from "@/lib/types"
+import { toast } from "sonner"
+
+export const customersKey = ["customers"] as const
+
+export function useCustomers() {
+  return useQuery({ queryKey: customersKey, queryFn: api.listCustomers })
+}
+
+export function useCustomer(id: string | undefined) {
+  return useQuery({
+    queryKey: [...customersKey, id],
+    queryFn: () => api.getCustomer(id as string),
+    enabled: !!id,
+  })
+}
+
+export function useCreateCustomer(actorId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: Omit<Customer, "id" | "createdAt" | "orderNumber">) => api.createCustomer(input, actorId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: customersKey })
+      qc.invalidateQueries({ queryKey: ["contracts"] })
+      qc.invalidateQueries({ queryKey: ["notifications"] })
+      qc.invalidateQueries({ queryKey: ["activityLogs"] })
+      toast.success("Customer added successfully")
+    },
+    onError: () => toast.error("Failed to add customer"),
+  })
+}
+
+export function useUpdateCustomer(actorId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: Partial<Omit<Customer, "id" | "createdAt" | "orderNumber">> }) =>
+      api.updateCustomer(id, input, actorId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: customersKey })
+      qc.invalidateQueries({ queryKey: ["contracts"] })
+      qc.invalidateQueries({ queryKey: ["activityLogs"] })
+      toast.success("Customer updated successfully")
+    },
+    onError: () => toast.error("Failed to update customer"),
+  })
+}
+
+export function useDeleteCustomer(actorId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.deleteCustomer(id, actorId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: customersKey })
+      qc.invalidateQueries({ queryKey: ["contracts"] })
+      qc.invalidateQueries({ queryKey: ["activityLogs"] })
+      toast.success("Customer deleted")
+    },
+    onError: () => toast.error("Failed to delete customer"),
+  })
+}
