@@ -67,16 +67,6 @@ export function generateId(prefix: string): string {
   return `${prefix}-${Math.random().toString(36).slice(2, 9)}${Date.now().toString(36).slice(-4)}`
 }
 
-// SHA-256 via the browser's Web Crypto API — there's no real backend here, but
-// passwords still shouldn't sit in localStorage as plain text.
-export async function hashPassword(password: string): Promise<string> {
-  const data = new TextEncoder().encode(password)
-  const digest = await crypto.subtle.digest("SHA-256", data)
-  return Array.from(new Uint8Array(digest))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("")
-}
-
 const ORDER_NUMBER_PREFIX = "SK001"
 
 export function formatOrderNumber(sequence: number): string {

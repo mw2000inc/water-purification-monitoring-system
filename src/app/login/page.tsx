@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation"
 import { z } from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm, Controller } from "react-hook-form"
-import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { ShieldCheck, UserRound, Eye, EyeOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -14,10 +13,8 @@ import { Logo } from "@/components/shared/logo"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useAuth } from "@/lib/auth/auth-context"
-import { store } from "@/lib/mock/store"
-import { createUser } from "@/lib/api/misc"
-import { usersKey } from "@/lib/hooks/use-misc"
-import { cn, hashPassword } from "@/lib/utils"
+import { supabase } from "@/lib/supabase/client"
+import { cn } from "@/lib/utils"
 
 const signInSchema = z.object({
   email: z.string().email("Enter a valid email address"),
@@ -65,9 +62,8 @@ const PasswordInput = React.forwardRef<HTMLInputElement, React.ComponentProps<ty
 )
 
 export default function LoginPage() {
-  const { login, user, loading } = useAuth()
+  const { user, loading } = useAuth()
   const router = useRouter()
-  const queryClient = useQueryClient()
   const [mode, setMode] = React.useState<Mode>("signup")
 
   React.useEffect(() => {
@@ -85,41 +81,33 @@ export default function LoginPage() {
   })
 
   async function onSignIn(values: z.infer<typeof signInSchema>) {
-    const email = values.email.trim().toLowerCase()
-    const found = store.state.users.find((u) => u.email.trim().toLowerCase() === email)
-    if (!found) {
-      toast.error("No account found with that email. Sign up to create one.")
+    const { error } = await supabase.auth.signInWithPassword({
+      email: values.email.trim(),
+      password: values.password,
+    })
+    if (error) {
+      signInForm.setError("password", { message: "Incorrect email or password." })
       return
     }
-    if (!found.passwordHash) {
-      signInForm.setError("password", {
-        message: "This account has no password set. Contact an admin to reset it.",
-      })
-      return
-    }
-    const enteredHash = await hashPassword(values.password)
-    if (enteredHash !== found.passwordHash) {
-      signInForm.setError("password", { message: "Incorrect password." })
-      return
-    }
-    login(found.id)
+    // AuthProvider's onAuthStateChange listener picks up the new session, which
+    // updates `user` above and triggers the redirect effect.
   }
 
   async function onSignUp(values: z.infer<typeof signUpSchema>) {
-    const email = values.email.trim().toLowerCase()
-    const existing = store.state.users.find((u) => u.email.trim().toLowerCase() === email)
-    if (existing) {
-      signUpForm.setError("email", { message: "An account with this email already exists." })
+    const { error } = await supabase.auth.signUp({
+      email: values.email.trim(),
+      password: values.password,
+      options: { data: { name: values.name.trim(), role: values.role } },
+    })
+    if (error) {
+      if (error.message.toLowerCase().includes("already")) {
+        signUpForm.setError("email", { message: "An account with this email already exists." })
+      } else {
+        toast.error(error.message)
+      }
       return
     }
-    const passwordHash = await hashPassword(values.password)
-    const created = await createUser(
-      { name: values.name.trim(), email: values.email.trim(), role: values.role, passwordHash },
-      "self-signup"
-    )
-    queryClient.invalidateQueries({ queryKey: usersKey })
     toast.success("Account created! Welcome to MW2000.")
-    login(created.id)
   }
 
   const signInEmailError = signInForm.formState.errors.email?.message

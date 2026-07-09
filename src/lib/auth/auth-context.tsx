@@ -2,7 +2,8 @@
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
-import { store } from "@/lib/mock/store"
+import type { Session } from "@supabase/supabase-js"
+import { supabase } from "@/lib/supabase/client"
 import type { Role, User } from "@/lib/types"
 
 export type Permission =
@@ -24,17 +25,34 @@ const STAFF_ALLOWED: Permission[] = [
   "sales:add",
 ]
 
-const SESSION_KEY = "aquatrack-session"
-
 interface AuthContextValue {
   user: User | null
   loading: boolean
-  login: (userId: string) => void
-  logout: () => void
+  logout: () => Promise<void>
   can: (permission: Permission) => boolean
+  refreshUser: () => Promise<void>
 }
 
 const AuthContext = React.createContext<AuthContextValue | undefined>(undefined)
+
+async function loadProfile(session: Session | null): Promise<User | null> {
+  if (!session) return null
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, name, email, role, avatar_url, phone, created_at")
+    .eq("id", session.user.id)
+    .single()
+  if (error || !data) return null
+  return {
+    id: data.id,
+    name: data.name,
+    email: data.email,
+    role: data.role,
+    avatarUrl: data.avatar_url ?? undefined,
+    phone: data.phone ?? undefined,
+    createdAt: data.created_at,
+  }
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = React.useState<User | null>(null)
@@ -42,35 +60,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter()
 
   React.useEffect(() => {
-    // One-time bootstrap from localStorage on mount (client-only external system, not derivable during render).
-    const raw = window.localStorage.getItem(SESSION_KEY)
-    if (raw) {
-      const userId = JSON.parse(raw) as string
-      const found = store.state.users.find((u) => u.id === userId)
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      if (found) setUser(found)
+    let active = true
+    // One-time bootstrap of the existing session on mount (client-only external system).
+    supabase.auth.getSession().then(async ({ data }) => {
+      const profile = await loadProfile(data.session)
+      if (!active) return
+      setUser(profile)
+      setLoading(false)
+    })
+
+    const { data: subscription } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      const profile = await loadProfile(session)
+      if (!active) return
+      setUser(profile)
+      setLoading(false)
+    })
+
+    return () => {
+      active = false
+      subscription.subscription.unsubscribe()
     }
-    setLoading(false)
   }, [])
 
-  const login = React.useCallback(
-    (userId: string) => {
-      const found = store.state.users.find((u) => u.id === userId)
-      if (!found) return
-      setUser(found)
-      window.localStorage.setItem(SESSION_KEY, JSON.stringify(found.id))
-      store.recordLogin(found.id)
-      router.push("/")
-    },
-    [router]
-  )
+  const refreshUser = React.useCallback(async () => {
+    const { data } = await supabase.auth.getSession()
+    setUser(await loadProfile(data.session))
+  }, [])
 
-  const logout = React.useCallback(() => {
-    if (user) store.recordLogout(user.id)
+  const logout = React.useCallback(async () => {
+    await supabase.auth.signOut()
     setUser(null)
-    window.localStorage.removeItem(SESSION_KEY)
     router.push("/login")
-  }, [router, user])
+  }, [router])
 
   const can = React.useCallback(
     (permission: Permission) => {
@@ -82,8 +103,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   )
 
   const value = React.useMemo(
-    () => ({ user, loading, login, logout, can }),
-    [user, loading, login, logout, can]
+    () => ({ user, loading, logout, can, refreshUser }),
+    [user, loading, logout, can, refreshUser]
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

@@ -15,21 +15,27 @@ export function useUsers() {
 export function useCreateUser(actorId: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (input: Omit<User, "id" | "createdAt">) => api.createUser(input, actorId),
+    mutationFn: (input: { name: string; email: string; role: User["role"]; password: string }) =>
+      api.createUser(input, actorId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: usersKey })
       qc.invalidateQueries({ queryKey: activityLogsKey })
       toast.success("User created successfully")
     },
-    onError: () => toast.error("Failed to create user"),
+    onError: (err: Error) => toast.error(err.message || "Failed to create user"),
   })
 }
 
 export function useUpdateUser(actorId: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, input }: { id: string; input: Partial<Omit<User, "id" | "createdAt">> }) =>
-      api.updateUser(id, input, actorId),
+    mutationFn: ({
+      id,
+      input,
+    }: {
+      id: string
+      input: Partial<Pick<User, "name" | "email" | "role" | "avatarUrl" | "phone">>
+    }) => api.updateUser(id, input, actorId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: usersKey })
       qc.invalidateQueries({ queryKey: activityLogsKey })

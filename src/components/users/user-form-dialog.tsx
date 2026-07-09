@@ -31,7 +31,6 @@ import {
 } from "@/components/ui/select"
 import { useAuth } from "@/lib/auth/auth-context"
 import { useCreateUser, useUpdateUser } from "@/lib/hooks/use-misc"
-import { hashPassword } from "@/lib/utils"
 import type { User } from "@/lib/types"
 
 const schema = z.object({
@@ -85,8 +84,7 @@ export function UserFormDialog({
         form.setError("password", { message: "Password must be at least 6 characters" })
         return
       }
-      const passwordHash = await hashPassword(password)
-      await createUser.mutateAsync({ ...rest, passwordHash })
+      await createUser.mutateAsync({ ...rest, password })
     }
     onOpenChange(false)
   }
