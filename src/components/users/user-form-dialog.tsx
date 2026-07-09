@@ -31,12 +31,14 @@ import {
 } from "@/components/ui/select"
 import { useAuth } from "@/lib/auth/auth-context"
 import { useCreateUser, useUpdateUser } from "@/lib/hooks/use-misc"
+import { hashPassword } from "@/lib/utils"
 import type { User } from "@/lib/types"
 
 const schema = z.object({
   name: z.string().min(2, "Full name is required"),
   email: z.string().email("Enter a valid email address"),
   role: z.enum(["admin", "staff"]),
+  password: z.string(),
 })
 
 type FormValues = z.infer<typeof schema>
@@ -46,6 +48,7 @@ function defaultValues(user?: User): FormValues {
     name: user?.name ?? "",
     email: user?.email ?? "",
     role: user?.role ?? "staff",
+    password: "",
   }
 }
 
@@ -74,10 +77,16 @@ export function UserFormDialog({
   }, [open, user])
 
   async function onSubmit(values: FormValues) {
+    const { password, ...rest } = values
     if (isEdit) {
-      await updateUser.mutateAsync({ id: user.id, input: values })
+      await updateUser.mutateAsync({ id: user.id, input: rest })
     } else {
-      await createUser.mutateAsync(values)
+      if (password.length < 6) {
+        form.setError("password", { message: "Password must be at least 6 characters" })
+        return
+      }
+      const passwordHash = await hashPassword(password)
+      await createUser.mutateAsync({ ...rest, passwordHash })
     }
     onOpenChange(false)
   }
@@ -121,6 +130,21 @@ export function UserFormDialog({
                 </FormItem>
               )}
             />
+            {!isEdit && (
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Password</FormLabel>
+                    <FormControl>
+                      <Input type="password" placeholder="••••••••" autoComplete="new-password" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
             <FormField
               control={form.control}
               name="role"

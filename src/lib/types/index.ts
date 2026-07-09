@@ -7,6 +7,7 @@ export interface User {
   role: Role
   avatarUrl?: string
   phone?: string
+  passwordHash?: string
   createdAt: string
 }
 
