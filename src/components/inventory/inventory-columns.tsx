@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { StockStatusBadge } from "@/components/shared/status-badge"
-import { formatCurrency } from "@/lib/utils"
+import { formatCurrency, formatDate } from "@/lib/utils"
 import type { Product, StockStatus } from "@/lib/types"
 
 export type ProductRow = Product & { stockStatus: StockStatus; supplierName: string }
@@ -38,6 +38,11 @@ export function getInventoryColumns({
       accessorKey: "name",
       header: "Product Name",
       cell: ({ row }) => <div className="font-medium">{row.original.name}</div>,
+    },
+    {
+      accessorKey: "dateAdded",
+      header: "Date Added",
+      cell: ({ row }) => formatDate(row.original.dateAdded),
     },
     {
       accessorKey: "stockQuantity",

@@ -15,7 +15,6 @@ export const TECHNICIANS = [
 ] as const
 
 export const PRODUCT_CATEGORIES = [
-  "Dispensers",
   "Purifiers",
   "Filters",
   "Accessories",

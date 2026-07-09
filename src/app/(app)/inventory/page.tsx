@@ -86,6 +86,7 @@ export default function InventoryPage() {
   const exportColumns = [
     { header: "SKU", key: "sku" },
     { header: "Product Name", key: "name" },
+    { header: "Date Added", key: "dateAdded" },
     { header: "Category", key: "category" },
     { header: "Supplier", key: "supplierName" },
     { header: "Stock Qty", key: "stockQuantity" },

@@ -3,7 +3,7 @@
 import * as React from "react"
 import { z } from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { useForm } from "react-hook-form"
+import { useForm, Controller } from "react-hook-form"
 import { useQueryClient } from "@tanstack/react-query"
 import { Truck } from "lucide-react"
 import {
@@ -16,14 +16,8 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form"
+import { Label } from "@/components/ui/label"
+import { FormItem } from "@/components/ui/form"
 import {
   Select,
   SelectContent,
@@ -105,27 +99,24 @@ export function ProductFormDialog({
   }
 
   const pending = createProduct.isPending || updateProduct.isPending
+  const errors = form.formState.errors
 
+  // Plain uncontrolled inputs (register(), not a Controller value/onChange binding) —
+  // this is the same fix used for the login page: some browser/extension setups fight
+  // a *controlled* value, and it also means a "0" can be backspaced/replaced in one go
+  // instead of requiring a double-click-to-select first.
   const numberField = (name: keyof FormValues, label: string, step = "1") => (
-    <FormField
-      control={form.control}
-      name={name}
-      render={({ field }) => (
-        <FormItem>
-          <FormLabel>{label}</FormLabel>
-          <FormControl>
-            <Input
-              type="number"
-              min={0}
-              step={step}
-              value={field.value as number}
-              onChange={(e) => field.onChange(e.target.valueAsNumber || 0)}
-            />
-          </FormControl>
-          <FormMessage />
-        </FormItem>
-      )}
-    />
+    <div className="grid gap-2">
+      <Label>{label}</Label>
+      <Input
+        type="number"
+        min={0}
+        step={step}
+        aria-invalid={!!errors[name]}
+        {...form.register(name, { valueAsNumber: true })}
+      />
+      {errors[name] && <p className="text-destructive text-sm">{errors[name]?.message as string}</p>}
+    </div>
   )
 
   return (
@@ -138,34 +129,23 @@ export function ProductFormDialog({
             {isEdit ? "Update this inventory item." : "Register a new inventory item."}
           </DialogDescription>
         </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem className="sm:col-span-2">
-                    <FormLabel>Product Name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="5-Stage RO Filter System" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
+              <div className="grid gap-2 sm:col-span-2">
+                <Label>Product Name</Label>
+                <Input placeholder="5-Stage RO Filter System" aria-invalid={!!errors.name} {...form.register("name")} />
+                {errors.name && <p className="text-destructive text-sm">{errors.name.message}</p>}
+              </div>
+              <Controller
                 control={form.control}
                 name="category"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Category</FormLabel>
+                    <Label>Category</Label>
                     <Select value={field.value} onValueChange={field.onChange}>
-                      <FormControl>
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Select category" />
-                        </SelectTrigger>
-                      </FormControl>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
                       <SelectContent>
                         {PRODUCT_CATEGORIES.map((c) => (
                           <SelectItem key={c} value={c}>
@@ -174,16 +154,15 @@ export function ProductFormDialog({
                         ))}
                       </SelectContent>
                     </Select>
-                    <FormMessage />
                   </FormItem>
                 )}
               />
-              <FormField
+              <Controller
                 control={form.control}
                 name="supplierId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Supplier</FormLabel>
+                    <Label>Supplier</Label>
                     <Select
                       value={field.value}
                       onValueChange={(v) => {
@@ -194,13 +173,11 @@ export function ProductFormDialog({
                         field.onChange(v)
                       }}
                     >
-                      <FormControl>
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Select supplier">
-                            {suppliers.find((s) => s.id === field.value)?.name}
-                          </SelectValue>
-                        </SelectTrigger>
-                      </FormControl>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select supplier">
+                          {suppliers.find((s) => s.id === field.value)?.name}
+                        </SelectValue>
+                      </SelectTrigger>
                       <SelectContent>
                         <SelectItem value={ADD_NEW_SUPPLIER} className="text-primary font-medium">
                           <Truck className="h-4 w-4" /> Add New Supplier
@@ -213,36 +190,19 @@ export function ProductFormDialog({
                         ))}
                       </SelectContent>
                     </Select>
-                    <FormMessage />
+                    {errors.supplierId && <p className="text-destructive text-sm">{errors.supplierId.message}</p>}
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="sku"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>SKU</FormLabel>
-                    <FormControl>
-                      <Input placeholder="FLT-RO-004" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="barcode"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Barcode (Optional)</FormLabel>
-                    <FormControl>
-                      <Input placeholder="4801234567893" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="grid gap-2">
+                <Label>SKU</Label>
+                <Input placeholder="SK01" aria-invalid={!!errors.sku} {...form.register("sku")} />
+                {errors.sku && <p className="text-destructive text-sm">{errors.sku.message}</p>}
+              </div>
+              <div className="grid gap-2">
+                <Label>Barcode (Optional)</Label>
+                <Input placeholder="4801234567893" {...form.register("barcode")} />
+              </div>
               {numberField("stockQuantity", "Stock Quantity")}
               {numberField("minStockLevel", "Minimum Stock Level")}
               {numberField("purchasePrice", "Purchase Price", "0.01")}
@@ -257,7 +217,6 @@ export function ProductFormDialog({
               </Button>
             </DialogFooter>
           </form>
-        </Form>
       </DialogContent>
     </Dialog>
     <SupplierFormDialog
