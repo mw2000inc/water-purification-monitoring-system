@@ -1,17 +1,14 @@
 export const DISPENSER_TYPES = [
-  "Bottom Load",
-  "Top Load Hot & Cold",
-  "Countertop POU",
-  "Under-sink RO",
-  "Whole-house System",
+  "SK2 White",
+  "SK2 Purple",
+  "SK2 Black",
+  "SK2 Pink",
 ] as const
 
 export const TECHNICIANS = [
-  "Kevin Aguilar",
-  "Mark Villaruel",
-  "Jerome Sison",
-  "Paolo Ignacio",
-  "Rico Bautista",
+  "Joselito Compereso",
+  "Jerson Capellon",
+  "N/A",
 ] as const
 
 export const PRODUCT_CATEGORIES = [

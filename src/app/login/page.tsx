@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Logo } from "@/components/shared/logo"
 import { Label } from "@/components/ui/label"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useAuth } from "@/lib/auth/auth-context"
 import { supabase } from "@/lib/supabase/client"
@@ -35,6 +36,8 @@ const signUpSchema = z
   })
 
 type Mode = "signin" | "signup"
+
+const REMEMBERED_EMAIL_KEY = "mw2000-remembered-email"
 
 const PasswordInput = React.forwardRef<HTMLInputElement, React.ComponentProps<typeof Input>>(
   function PasswordInput({ className, ...props }, ref) {
@@ -74,6 +77,17 @@ export default function LoginPage() {
     resolver: zodResolver(signInSchema),
     defaultValues: { email: "", password: "" },
   })
+  const [rememberMe, setRememberMe] = React.useState(
+    () => typeof window !== "undefined" && !!window.localStorage.getItem(REMEMBERED_EMAIL_KEY)
+  )
+
+  // Pre-fill the remembered email (never the password — that's the browser's own
+  // password manager's job, not something we store ourselves) on first load.
+  React.useEffect(() => {
+    const remembered = window.localStorage.getItem(REMEMBERED_EMAIL_KEY)
+    if (remembered) signInForm.setValue("email", remembered)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const signUpForm = useForm<z.infer<typeof signUpSchema>>({
     resolver: zodResolver(signUpSchema),
@@ -88,6 +102,11 @@ export default function LoginPage() {
     if (error) {
       signInForm.setError("password", { message: "Incorrect email or password." })
       return
+    }
+    if (rememberMe) {
+      window.localStorage.setItem(REMEMBERED_EMAIL_KEY, values.email.trim())
+    } else {
+      window.localStorage.removeItem(REMEMBERED_EMAIL_KEY)
     }
     // AuthProvider's onAuthStateChange listener picks up the new session, which
     // updates `user` above and triggers the redirect effect.
@@ -164,6 +183,10 @@ export default function LoginPage() {
                   />
                   {signInPasswordError && <p className="text-destructive text-sm">{signInPasswordError}</p>}
                 </div>
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <Checkbox checked={rememberMe} onCheckedChange={(v) => setRememberMe(v === true)} />
+                  Remember me
+                </label>
                 <Button type="submit" className="w-full" disabled={signInForm.formState.isSubmitting}>
                   Sign in
                 </Button>

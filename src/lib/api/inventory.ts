@@ -78,7 +78,16 @@ export async function updateProduct(
 
 export async function deleteProduct(id: string, actorId: string): Promise<void> {
   const { error } = await supabase.from("products").delete().eq("id", id)
-  if (error) throw error
+  if (error) {
+    // 23503 = foreign key violation. Stock movements cascade-delete with the product,
+    // but sale_items (real invoice history) intentionally does not — so this means the
+    // product appears on at least one past sale and can't be removed without corrupting
+    // that record.
+    if (error.code === "23503") {
+      throw new Error("Can't delete — this product is part of a past sale. Remove it from those sales first.")
+    }
+    throw error
+  }
   await logActivity(actorId, "Inventory Updated")
 }
 
@@ -98,9 +107,11 @@ export async function createSupplier(input: Omit<Supplier, "id">, actorId: strin
 type StockMovementRow = {
   id: string
   date: string
+  created_at: string
   product_id: string
   quantity_added: number
   quantity_removed: number
+  second_hand_quantity: number
   reason: string
   user_id: string
   reference_number: string
@@ -110,9 +121,11 @@ function movementFromRow(row: StockMovementRow): StockMovement {
   return {
     id: row.id,
     date: row.date,
+    createdAt: row.created_at,
     productId: row.product_id,
     quantityAdded: row.quantity_added,
     quantityRemoved: row.quantity_removed,
+    secondHandQuantity: row.second_hand_quantity,
     reason: row.reason as StockMovement["reason"],
     userId: row.user_id,
     referenceNumber: row.reference_number,
@@ -120,12 +133,18 @@ function movementFromRow(row: StockMovementRow): StockMovement {
 }
 
 export async function listStockMovements(): Promise<StockMovement[]> {
-  const { data, error } = await supabase.from("stock_movements").select("*").order("date", { ascending: false })
+  // Order by the real creation timestamp, not the day-only `date` field — same-day
+  // movements otherwise come back in an arbitrary order and scramble the running
+  // stock-balance reconstruction on the Stock Movements page.
+  const { data, error } = await supabase.from("stock_movements").select("*").order("created_at", { ascending: false })
   if (error) throw error
   return (data as StockMovementRow[]).map(movementFromRow)
 }
 
-export async function addStockMovement(input: Omit<StockMovement, "id">, actorId: string): Promise<StockMovement> {
+export async function addStockMovement(
+  input: Omit<StockMovement, "id" | "createdAt">,
+  actorId: string
+): Promise<StockMovement> {
   const { data, error } = await supabase
     .from("stock_movements")
     .insert({
@@ -133,6 +152,7 @@ export async function addStockMovement(input: Omit<StockMovement, "id">, actorId
       product_id: input.productId,
       quantity_added: input.quantityAdded,
       quantity_removed: input.quantityRemoved,
+      second_hand_quantity: input.secondHandQuantity,
       reason: input.reason,
       user_id: input.userId,
       reference_number: input.referenceNumber,

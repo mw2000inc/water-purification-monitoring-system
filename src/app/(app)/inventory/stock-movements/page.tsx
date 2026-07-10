@@ -39,43 +39,51 @@ export default function StockMovementsPage() {
   const isPending = p1 || p2 || p3
 
   const rows: StockMovementRow[] = React.useMemo(() => {
-    // Movements are stored newest-created-first; group per product so we can walk
-    // each product's own history chronologically and rebuild the stock level as it
-    // was on each date, rather than stamping every row with today's live quantity.
-    const byProduct = new Map<string, { movement: (typeof movements)[number]; index: number }[]>()
-    movements.forEach((m, index) => {
+    // Group per product so we can walk each product's own history in true creation
+    // order (via createdAt, not array position — Postgres doesn't guarantee same-day
+    // rows come back in insertion order) and rebuild the stock level as it was at
+    // each point in time, rather than stamping every row with today's live quantity.
+    const byProduct = new Map<string, (typeof movements)[number][]>()
+    movements.forEach((m) => {
       const list = byProduct.get(m.productId) ?? []
-      list.push({ movement: m, index })
+      list.push(m)
       byProduct.set(m.productId, list)
     })
 
+    // Current Stock = the combined balance going INTO a movement (opening); Actual
+    // Stock = the combined balance coming OUT of it (Current Stock + Qty Added -
+    // Qty Removed + 2nd Hand). Both pools count toward this single running total —
+    // only the product's own stock_quantity column tracks the regular pool, so we
+    // back-solve the combined opening balance from the live totals of both.
     const actualStockByMovementId = new Map<string, number>()
+    const currentStockByMovementId = new Map<string, number>()
     byProduct.forEach((entries, productId) => {
       const product = products.find((p) => p.id === productId)
-      const netTotal = entries.reduce((sum, e) => sum + e.movement.quantityAdded - e.movement.quantityRemoved, 0)
-      const currentStock = product?.stockQuantity ?? netTotal
-      const opening = currentStock - netTotal
+      const netRegular = entries.reduce((sum, e) => sum + e.quantityAdded - e.quantityRemoved, 0)
+      const liveRegular = product?.stockQuantity ?? netRegular
+      // 2nd hand has no persisted anchor on the product row (it starts at 0), so only
+      // the regular pool's change needs to be reversed out of the live value here.
+      const opening = liveRegular - netRegular
 
-      const chronological = [...entries].sort((a, b) => {
-        const dateDiff = a.movement.date.localeCompare(b.movement.date)
-        if (dateDiff !== 0) return dateDiff
-        return b.index - a.index // higher original index = created earlier = comes first
-      })
+      const chronological = [...entries].sort((a, b) => a.createdAt.localeCompare(b.createdAt))
 
       let running = opening
       for (const entry of chronological) {
-        running += entry.movement.quantityAdded - entry.movement.quantityRemoved
-        actualStockByMovementId.set(entry.movement.id, running)
+        currentStockByMovementId.set(entry.id, running)
+        running += entry.quantityAdded - entry.quantityRemoved + entry.secondHandQuantity
+        actualStockByMovementId.set(entry.id, running)
       }
     })
 
     return movements.map((m) => {
       const product = products.find((p) => p.id === m.productId)
+      const actualStock = actualStockByMovementId.get(m.id) ?? product?.stockQuantity ?? 0
       return {
         ...m,
         productName: product?.name ?? "Unknown",
         sku: product?.sku ?? "-",
-        actualStock: actualStockByMovementId.get(m.id) ?? product?.stockQuantity ?? 0,
+        actualStock,
+        currentStock: currentStockByMovementId.get(m.id) ?? actualStock,
         userName: users.find((u) => u.id === m.userId)?.name ?? "Unknown",
       }
     })

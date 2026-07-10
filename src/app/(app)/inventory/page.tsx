@@ -19,7 +19,7 @@ import { ConfirmDialog } from "@/components/shared/confirm-dialog"
 import { ExportButtons } from "@/components/shared/export-buttons"
 import { ProductFormDialog } from "@/components/inventory/product-form-dialog"
 import { getInventoryColumns, type ProductRow } from "@/components/inventory/inventory-columns"
-import { useDeleteProduct, useProducts, useSuppliers } from "@/lib/hooks/use-inventory"
+import { useDeleteProduct, useProducts, useStockMovements, useSuppliers } from "@/lib/hooks/use-inventory"
 import { useAuth } from "@/lib/auth/auth-context"
 import { formatDate, getStockStatus } from "@/lib/utils"
 import { PRODUCT_CATEGORIES } from "@/lib/constants"
@@ -29,6 +29,7 @@ export default function InventoryPage() {
   const { user, can } = useAuth()
   const { data: products = [], isPending: p1 } = useProducts()
   const { data: suppliers = [], isPending: p2 } = useSuppliers()
+  const { data: movements = [], isPending: p3 } = useStockMovements()
   const deleteProduct = useDeleteProduct(user?.id ?? "")
   const isAdmin = user?.role === "admin"
 
@@ -40,16 +41,31 @@ export default function InventoryPage() {
   const [deleting, setDeleting] = React.useState<Product | undefined>(undefined)
   const [filteredRows, setFilteredRows] = React.useState<ProductRow[]>([])
 
-  const isPending = p1 || p2
+  const isPending = p1 || p2 || p3
+
+  const secondHandTotals = React.useMemo(() => {
+    const totals = new Map<string, number>()
+    for (const m of movements) {
+      totals.set(m.productId, (totals.get(m.productId) ?? 0) + m.secondHandQuantity)
+    }
+    return totals
+  }, [movements])
 
   const rows: ProductRow[] = React.useMemo(
     () =>
-      products.map((p) => ({
-        ...p,
-        stockStatus: getStockStatus(p.stockQuantity, p.minStockLevel),
-        supplierName: suppliers.find((s) => s.id === p.supplierId)?.name ?? "Unknown",
-      })),
-    [products, suppliers]
+      products.map((p) => {
+        const secondHandQuantity = secondHandTotals.get(p.id) ?? 0
+        return {
+          ...p,
+          stockStatus: getStockStatus(p.stockQuantity, p.minStockLevel),
+          supplierName: suppliers.find((s) => s.id === p.supplierId)?.name ?? "Unknown",
+          secondHandQuantity,
+          brandNewQuantity: p.stockQuantity,
+          // Stock Qty is the combined total shown in this table — Brand New + 2nd Hand.
+          stockQuantity: p.stockQuantity + secondHandQuantity,
+        }
+      }),
+    [products, suppliers, secondHandTotals]
   )
 
   const years = React.useMemo(
@@ -74,11 +90,15 @@ export default function InventoryPage() {
         isAdmin: user?.role === "admin",
         canEdit: can("inventory:edit"),
         canDelete: can("inventory:delete"),
+        // Stock Qty on the row is the combined (Brand New + 2nd Hand) display value —
+        // restore the true raw stock quantity before handing the product to the
+        // edit/delete flows, so we never write the combined number back as if it
+        // were the real stockQuantity.
         onEdit: (p) => {
-          setEditing(p)
+          setEditing({ ...p, stockQuantity: p.brandNewQuantity })
           setFormOpen(true)
         },
-        onDelete: (p) => setDeleting(p),
+        onDelete: (p) => setDeleting({ ...p, stockQuantity: p.brandNewQuantity }),
       }),
     [can, user?.role]
   )
@@ -90,6 +110,8 @@ export default function InventoryPage() {
     { header: "Category", key: "category" },
     { header: "Supplier", key: "supplierName" },
     { header: "Stock Qty", key: "stockQuantity" },
+    { header: "Brand New", key: "brandNewQuantity" },
+    { header: "2nd Hand", key: "secondHandQuantity" },
     { header: "Min Level", key: "minStockLevel" },
     { header: "Status", key: "stockStatus" },
     ...(isAdmin ? [{ header: "Purchase Price", key: "purchasePrice" }] : []),

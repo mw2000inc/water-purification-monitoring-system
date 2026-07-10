@@ -13,7 +13,12 @@ import { StockStatusBadge } from "@/components/shared/status-badge"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import type { Product, StockStatus } from "@/lib/types"
 
-export type ProductRow = Product & { stockStatus: StockStatus; supplierName: string }
+export type ProductRow = Product & {
+  stockStatus: StockStatus
+  supplierName: string
+  secondHandQuantity: number
+  brandNewQuantity: number
+}
 
 export function getInventoryColumns({
   isAdmin,
@@ -49,6 +54,14 @@ export function getInventoryColumns({
       header: "Stock Qty",
     },
     {
+      accessorKey: "brandNewQuantity",
+      header: "Brand New",
+    },
+    {
+      accessorKey: "secondHandQuantity",
+      header: "2nd Hand",
+    },
+    {
       accessorKey: "minStockLevel",
       header: "Min Level",
     },
@@ -73,7 +86,7 @@ export function getInventoryColumns({
     cell: ({ row }) => (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => e.stopPropagation()}>
+          <Button variant="ghost" size="icon" className="h-8 w-8">
             <MoreHorizontal className="h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>

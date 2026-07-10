@@ -1,21 +1,24 @@
 "use client"
 
 import type { ColumnDef } from "@tanstack/react-table"
-import { formatDate } from "@/lib/utils"
+import { formatDateTime } from "@/lib/utils"
 import type { StockMovement } from "@/lib/types"
 
 export type StockMovementRow = StockMovement & {
   productName: string
   sku: string
   actualStock: number
+  currentStock: number
   userName: string
 }
 
 export const stockMovementsColumns: ColumnDef<StockMovementRow, unknown>[] = [
   {
-    accessorKey: "date",
-    header: "Date",
-    cell: ({ row }) => formatDate(row.original.date),
+    accessorKey: "createdAt",
+    header: "Date & Time",
+    // The exact timestamp (not just the day) an entry was recorded — lets the admin
+    // tell which movement happened first when several land on the same day.
+    cell: ({ row }) => formatDateTime(row.original.createdAt),
   },
   {
     accessorKey: "sku",
@@ -27,8 +30,9 @@ export const stockMovementsColumns: ColumnDef<StockMovementRow, unknown>[] = [
     header: "Product",
   },
   {
-    accessorKey: "actualStock",
-    header: "Actual Stock",
+    accessorKey: "currentStock",
+    header: "Current Stock",
+    cell: ({ row }) => <span className="font-medium">{row.original.currentStock}</span>,
   },
   {
     accessorKey: "quantityAdded",
@@ -51,16 +55,25 @@ export const stockMovementsColumns: ColumnDef<StockMovementRow, unknown>[] = [
       ),
   },
   {
+    accessorKey: "secondHandQuantity",
+    header: "2nd Hand",
+    cell: ({ row }) => {
+      const qty = row.original.secondHandQuantity
+      if (qty > 0) return <span className="text-success font-medium">+{qty}</span>
+      if (qty < 0) return <span className="text-danger font-medium">{qty}</span>
+      return <span className="text-muted-foreground">-</span>
+    },
+  },
+  {
+    accessorKey: "actualStock",
+    header: "Actual Stock",
+  },
+  {
     accessorKey: "reason",
     header: "Reason",
   },
   {
     accessorKey: "userName",
     header: "User",
-  },
-  {
-    accessorKey: "referenceNumber",
-    header: "Reference #",
-    cell: ({ row }) => <span className="font-mono text-xs">{row.original.referenceNumber}</span>,
   },
 ]

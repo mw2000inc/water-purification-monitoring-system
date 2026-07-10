@@ -208,7 +208,7 @@ export function CustomerFormDialog({
                 name="dispenserType"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Water Dispenser Type</FormLabel>
+                    <FormLabel>Water Purification Type</FormLabel>
                     <Select value={field.value} onValueChange={field.onChange}>
                       <FormControl>
                         <SelectTrigger className="w-full">

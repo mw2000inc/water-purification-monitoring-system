@@ -34,13 +34,18 @@ import { useAuth } from "@/lib/auth/auth-context"
 import { useAddStockMovement, useProducts } from "@/lib/hooks/use-inventory"
 import { generateId } from "@/lib/utils"
 
-const schema = z.object({
-  productId: z.string().min(1, "Select a product"),
-  direction: z.enum(["in", "out"]),
-  reason: z.enum(STOCK_MOVEMENT_REASONS),
-  quantity: z.number().int().min(1, "Min 1"),
-  referenceNumber: z.string().optional(),
-})
+const schema = z
+  .object({
+    productId: z.string().min(1, "Select a product"),
+    direction: z.enum(["in", "out"]),
+    reason: z.enum(STOCK_MOVEMENT_REASONS),
+    quantity: z.number().int().min(0),
+    secondHandQuantity: z.number().int().min(0),
+  })
+  .refine((data) => data.quantity > 0 || data.secondHandQuantity > 0, {
+    message: "Enter a quantity or a 2nd hand quantity",
+    path: ["quantity"],
+  })
 
 type FormValues = z.infer<typeof schema>
 
@@ -62,13 +67,13 @@ export function StockMovementFormDialog({
       direction: "in",
       reason: "Restock",
       quantity: 1,
-      referenceNumber: "",
+      secondHandQuantity: 0,
     },
   })
 
   React.useEffect(() => {
     if (open) {
-      form.reset({ productId: "", direction: "in", reason: "Restock", quantity: 1, referenceNumber: "" })
+      form.reset({ productId: "", direction: "in", reason: "Restock", quantity: 1, secondHandQuantity: 0 })
     }
   }, [open, form])
 
@@ -78,14 +83,19 @@ export function StockMovementFormDialog({
       productId: values.productId,
       quantityAdded: values.direction === "in" ? values.quantity : 0,
       quantityRemoved: values.direction === "out" ? values.quantity : 0,
+      // Direction applies to 2nd hand stock too — Stock Out subtracts from the
+      // running 2nd hand total instead of always adding to it.
+      secondHandQuantity: values.direction === "out" ? -values.secondHandQuantity : values.secondHandQuantity,
       reason: values.reason,
       userId: user?.id ?? "",
-      referenceNumber: values.referenceNumber?.trim() || generateId("ADJ").toUpperCase(),
+      referenceNumber: generateId("ADJ").toUpperCase(),
     })
     onOpenChange(false)
   }
 
   const pending = addMovement.isPending
+  const selectedProductId = form.watch("productId")
+  const selectedProduct = products.find((p) => p.id === selectedProductId)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -116,6 +126,11 @@ export function StockMovementFormDialog({
                       ))}
                     </SelectContent>
                   </Select>
+                  {selectedProduct && (
+                    <p className="text-sm text-muted-foreground">
+                      Current stock: <span className="font-medium text-foreground">{selectedProduct.stockQuantity}</span> units
+                    </p>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}
@@ -177,7 +192,7 @@ export function StockMovementFormDialog({
                     <FormControl>
                       <Input
                         type="number"
-                        min={1}
+                        min={0}
                         value={field.value}
                         onChange={(e) => field.onChange(e.target.valueAsNumber || 0)}
                       />
@@ -188,12 +203,24 @@ export function StockMovementFormDialog({
               />
               <FormField
                 control={form.control}
-                name="referenceNumber"
+                name="secondHandQuantity"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Reference # (Optional)</FormLabel>
+                    <FormLabel>2nd Hand Qty (Optional)</FormLabel>
                     <FormControl>
-                      <Input placeholder="Auto-generated" {...field} />
+                      <Input
+                        type="number"
+                        min={0}
+                        className="[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                        value={field.value}
+                        onChange={(e) => {
+                          const value = e.target.valueAsNumber || 0
+                          field.onChange(value)
+                          // A movement is either regular stock or 2nd hand stock, not both —
+                          // entering a 2nd hand quantity clears the regular Quantity field.
+                          if (value > 0) form.setValue("quantity", 0)
+                        }}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

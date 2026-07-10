@@ -56,7 +56,7 @@ export function useDeleteProduct(actorId: string) {
       qc.invalidateQueries({ queryKey: ["activityLogs"] })
       toast.success("Product deleted")
     },
-    onError: () => toast.error("Failed to delete product"),
+    onError: (error: Error) => toast.error(error.message || "Failed to delete product"),
   })
 }
 
@@ -75,7 +75,7 @@ export function useCreateSupplier(actorId: string) {
 export function useAddStockMovement(actorId: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (input: Omit<StockMovement, "id">) => api.addStockMovement(input, actorId),
+    mutationFn: (input: Omit<StockMovement, "id" | "createdAt">) => api.addStockMovement(input, actorId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: stockMovementsKey })
       qc.invalidateQueries({ queryKey: productsKey })

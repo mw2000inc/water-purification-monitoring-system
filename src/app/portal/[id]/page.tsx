@@ -122,7 +122,7 @@ export default function CustomerPortalPage() {
                 <InfoRow icon={Mail} label="Email Address" value={customer.email} />
                 <InfoRow icon={Phone} label="Contact Number" value={customer.contactNumber} />
                 <InfoRow icon={MapPin} label="Address" value={customer.address} className="sm:col-span-2" />
-                <InfoRow icon={Droplet} label="Water Dispenser Type" value={customer.dispenserType} />
+                <InfoRow icon={Droplet} label="Water Purification Type" value={customer.dispenserType} />
                 <InfoRow
                   icon={Droplet}
                   label="Water Filter Installed"

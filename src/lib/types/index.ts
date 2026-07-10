@@ -100,9 +100,11 @@ export type StockMovementReason =
 export interface StockMovement {
   id: string
   date: string
+  createdAt: string
   productId: string
   quantityAdded: number
   quantityRemoved: number
+  secondHandQuantity: number
   reason: StockMovementReason
   userId: string
   referenceNumber: string

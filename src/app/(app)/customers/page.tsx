@@ -80,7 +80,7 @@ export default function CustomersPage() {
     { header: "Address", key: "address" },
     { header: "Email", key: "email" },
     { header: "Contact Number", key: "contactNumber" },
-    { header: "Dispenser Type", key: "dispenserType" },
+    { header: "Water Purification Type", key: "dispenserType" },
     { header: "Technician", key: "assignedTechnician" },
   ]
 
