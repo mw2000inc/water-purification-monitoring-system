@@ -132,6 +132,26 @@ export interface ShopifyLineItem {
   title: string
 }
 
+export interface ShopifyCustomer {
+  id: number
+  first_name: string | null
+  last_name: string | null
+  email: string | null
+  phone: string | null
+}
+
+export interface ShopifyAddress {
+  first_name: string | null
+  last_name: string | null
+  phone: string | null
+  address1: string | null
+  address2: string | null
+  city: string | null
+  province: string | null
+  country: string | null
+  zip: string | null
+}
+
 export interface ShopifyOrder {
   id: number
   order_number: number
@@ -143,4 +163,10 @@ export interface ShopifyOrder {
   total_price: string
   total_discounts: string
   line_items: ShopifyLineItem[]
+  // Null for guest checkouts with no Shopify customer account — fall back to
+  // the order-level email/phone and the billing address in that case.
+  customer: ShopifyCustomer | null
+  email: string | null
+  phone: string | null
+  billing_address: ShopifyAddress | null
 }

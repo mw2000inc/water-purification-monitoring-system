@@ -27,9 +27,13 @@ export default function ContractsPage() {
 
   const rows: ContractRow[] = React.useMemo(() => {
     return contracts
-      // The Shopify placeholder customer has no real installed unit, so it has
-      // no meaningful quarterly-maintenance cycle — exclude it here.
-      .filter((c) => !customers.find((cust) => cust.id === c.customerId)?.isSystem)
+      // Neither the generic Shopify placeholder nor a real per-buyer Shopify
+      // customer has an installed unit, so neither has a meaningful
+      // quarterly-maintenance cycle — exclude both here.
+      .filter((c) => {
+        const customer = customers.find((cust) => cust.id === c.customerId)
+        return !customer?.isSystem && !customer?.isShopifyCustomer
+      })
       .map((c) => {
         const customer = customers.find((cust) => cust.id === c.customerId)
         // Quarterly checkpoints are counted from when the unit was actually installed,

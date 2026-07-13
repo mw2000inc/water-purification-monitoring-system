@@ -64,7 +64,13 @@ export default function DashboardPage() {
   // from customer/contract counts, but Shopify-origin sales still count toward
   // revenue below (that's the whole point of tracking them).
   const realCustomers = customers.filter((c) => !c.isSystem)
-  const realContracts = contracts.filter((c) => !customers.find((cust) => cust.id === c.customerId)?.isSystem)
+  // Quarterly Monitoring excludes both the generic placeholder and real
+  // per-buyer Shopify customers — neither has an installed unit — matching
+  // the same filter the Contracts page itself applies.
+  const realContracts = contracts.filter((c) => {
+    const customer = customers.find((cust) => cust.id === c.customerId)
+    return !customer?.isSystem && !customer?.isShopifyCustomer
+  })
   const summary = dashboardSummary(realCustomers, realContracts, sales, products)
   const monthly = monthlySalesSeries(sales)
   const registrations = customerRegistrationSeries(realCustomers)
@@ -80,7 +86,7 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <SummaryCard label="Total Customers" value={summary.totalCustomers} icon={Users} tone="primary" href="/customers" />
-        <SummaryCard label="Active Contracts" value={summary.activeContracts} icon={FileCheck2} tone="success" href="/contracts" />
+        <SummaryCard label="Quarterly Monitoring" value={summary.activeContracts} icon={FileCheck2} tone="success" href="/contracts" />
         <SummaryCard label="Expiring Contracts (30d)" value={summary.expiringContracts} icon={FileClock} tone="warning" href="/contracts" />
         <SummaryCard label="Sales Today" value={formatCurrency(summary.salesToday)} icon={CalendarDays} tone="secondary" href="/sales" />
         <SummaryCard label="Sales This Month" value={formatCurrency(summary.salesThisMonth)} icon={Wallet} tone="secondary" href="/sales" />

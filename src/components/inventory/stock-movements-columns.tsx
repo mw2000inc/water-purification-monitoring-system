@@ -52,7 +52,7 @@ export function getStockMovementsColumns({
     },
     {
       accessorKey: "currentStock",
-      header: "Current Stock",
+      header: "Previous Stock",
       cell: ({ row }) => <span className="font-medium">{row.original.currentStock}</span>,
     },
     {
@@ -87,7 +87,7 @@ export function getStockMovementsColumns({
     },
     {
       accessorKey: "actualStock",
-      header: "Actual Stock",
+      header: "Current Stock",
     },
     {
       id: "status",

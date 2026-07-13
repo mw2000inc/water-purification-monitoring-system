@@ -29,10 +29,18 @@ export interface Customer {
   assignedTechnician: string
   notes?: string
   createdAt: string
-  // True for the auto-created placeholder customer that Shopify-origin sales
-  // are billed to — not a real installed-unit contract, excluded from
-  // Customers/Contracts/Dashboard views.
+  // True for the one generic placeholder customer (fallback when a Shopify
+  // order has no usable buyer info) — hidden from Customers/Contracts/
+  // Dashboard entirely.
   isSystem?: boolean
+  // True for a real per-buyer customer auto-created/matched from a Shopify
+  // order — shows normally in Customers/Sales/Dashboard, but has no
+  // installed unit, so it's excluded from Contracts/Quarterly Monitoring
+  // the same way isSystem is.
+  isShopifyCustomer?: boolean
+  // Shopify's own customer id — the stable key repeat orders are matched
+  // against, since it survives an email change; null for guest checkouts.
+  shopifyCustomerId?: string
 }
 
 export type MonitoringStatus = "active" | "for-replacement"

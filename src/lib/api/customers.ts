@@ -20,6 +20,8 @@ type CustomerRow = {
   notes: string | null
   created_at: string
   is_system: boolean
+  is_shopify_customer: boolean
+  shopify_customer_id: string | null
 }
 
 function fromRow(row: CustomerRow): Customer {
@@ -41,6 +43,8 @@ function fromRow(row: CustomerRow): Customer {
     notes: row.notes ?? undefined,
     createdAt: row.created_at,
     isSystem: row.is_system,
+    isShopifyCustomer: row.is_shopify_customer,
+    shopifyCustomerId: row.shopify_customer_id ?? undefined,
   }
 }
 
