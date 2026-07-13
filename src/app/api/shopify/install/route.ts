@@ -28,10 +28,15 @@ export async function GET() {
   const clientId = process.env.SHOPIFY_CLIENT_ID
   const appUrl = process.env.SHOPIFY_APP_URL
   if (!shop || !clientId || !appUrl) {
-    return NextResponse.json(
-      { error: "Missing SHOPIFY_SHOP_DOMAIN, SHOPIFY_CLIENT_ID, or SHOPIFY_APP_URL env vars" },
-      { status: 500 }
-    )
+    // TEMPORARY DEBUG — names exactly which var(s) are undefined at runtime,
+    // rather than a vague "one of these three" message, so a Vercel env var
+    // typo/scoping issue is obvious instead of guessed at.
+    const missing = [
+      !shop && "SHOPIFY_SHOP_DOMAIN",
+      !clientId && "SHOPIFY_CLIENT_ID",
+      !appUrl && "SHOPIFY_APP_URL",
+    ].filter((v): v is string => !!v)
+    return NextResponse.json({ error: `Missing env var(s): ${missing.join(", ")}` }, { status: 500 })
   }
 
   const state = crypto.randomBytes(24).toString("hex")
