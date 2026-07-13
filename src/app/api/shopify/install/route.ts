@@ -28,9 +28,9 @@ export async function GET() {
   const clientId = process.env.SHOPIFY_CLIENT_ID
   const appUrl = process.env.SHOPIFY_APP_URL
   if (!shop || !clientId || !appUrl) {
-    // TEMPORARY DEBUG — names exactly which var(s) are undefined at runtime,
-    // rather than a vague "one of these three" message, so a Vercel env var
-    // typo/scoping issue is obvious instead of guessed at.
+    // Names exactly which var(s) are undefined, rather than a vague
+    // "one of these three" message, so a misconfigured Vercel env var is
+    // obvious instead of guessed at.
     const missing = [
       !shop && "SHOPIFY_SHOP_DOMAIN",
       !clientId && "SHOPIFY_CLIENT_ID",
