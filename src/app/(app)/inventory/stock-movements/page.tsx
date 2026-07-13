@@ -88,6 +88,7 @@ export default function StockMovementsPage() {
         sku: product?.sku ?? "-",
         actualStock,
         currentStock: currentStockByMovementId.get(m.id) ?? actualStock,
+        minStockLevel: product?.minStockLevel ?? 0,
         userName: users.find((u) => u.id === m.userId)?.name ?? "Unknown",
       }
     })

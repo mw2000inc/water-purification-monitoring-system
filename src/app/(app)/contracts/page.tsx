@@ -28,10 +28,14 @@ export default function ContractsPage() {
   const rows: ContractRow[] = React.useMemo(() => {
     return contracts.map((c) => {
       const customer = customers.find((cust) => cust.id === c.customerId)
+      // Quarterly checkpoints are counted from when the unit was actually installed,
+      // not the paperwork/contract start — falls back to contract start for customers
+      // who don't have an installed date on file yet.
+      const anchor = customer?.installedDate ?? c.startDate
       // The current quarterly cycle: the 3-month checkpoint is the next one on/after
       // today, start is exactly 3 months before that — every checkpoint from there on
       // (3/6/9 months) stays exactly 3 months apart from the last.
-      const periodEnd = getNextQuarterlyDate(c.startDate)
+      const periodEnd = getNextQuarterlyDate(anchor)
       const periodStart = subMonths(periodEnd, 3)
       const threeMonthDate = format(periodEnd, "yyyy-MM-dd")
       const sixMonthDate = format(addMonths(periodEnd, 3), "yyyy-MM-dd")

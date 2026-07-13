@@ -1,7 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import * as api from "@/lib/api/inventory"
 import type { Product, StockMovement, Supplier } from "@/lib/types"
+import { getStockStatus } from "@/lib/utils"
 import { toast } from "sonner"
+
+function warnIfLowStock(result: api.StockMovementResult) {
+  const status = getStockStatus(result.stockQuantity, result.minStockLevel)
+  if (status === "out-of-stock") {
+    toast.warning(`${result.productName} is now out of stock`)
+  } else if (status === "low-stock") {
+    toast.warning(`${result.productName} is at/below its minimum stock level (${result.stockQuantity} left)`)
+  }
+}
 
 export const productsKey = ["products"] as const
 export const suppliersKey = ["suppliers"] as const
@@ -76,12 +86,13 @@ export function useAddStockMovement(actorId: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (input: Omit<StockMovement, "id" | "createdAt">) => api.addStockMovement(input, actorId),
-    onSuccess: () => {
+    onSuccess: (result) => {
       qc.invalidateQueries({ queryKey: stockMovementsKey })
       qc.invalidateQueries({ queryKey: productsKey })
       qc.invalidateQueries({ queryKey: ["notifications"] })
       qc.invalidateQueries({ queryKey: ["activityLogs"] })
       toast.success("Stock movement recorded")
+      warnIfLowStock(result)
     },
     onError: () => toast.error("Failed to record stock movement"),
   })
@@ -97,12 +108,13 @@ export function useUpdateStockMovement(actorId: string) {
       id: string
       input: Pick<StockMovement, "quantityAdded" | "quantityRemoved" | "secondHandQuantity" | "reason">
     }) => api.updateStockMovement(id, input, actorId),
-    onSuccess: () => {
+    onSuccess: (result) => {
       qc.invalidateQueries({ queryKey: stockMovementsKey })
       qc.invalidateQueries({ queryKey: productsKey })
       qc.invalidateQueries({ queryKey: ["notifications"] })
       qc.invalidateQueries({ queryKey: ["activityLogs"] })
       toast.success("Stock movement updated")
+      warnIfLowStock(result)
     },
     onError: (error: Error) => toast.error(error.message || "Failed to update stock movement"),
   })

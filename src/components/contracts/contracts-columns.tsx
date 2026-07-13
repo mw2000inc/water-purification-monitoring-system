@@ -47,7 +47,7 @@ export function getContractColumns(): ColumnDef<ContractRow, unknown>[] {
     },
     {
       accessorKey: "startDate",
-      header: "Start Date",
+      header: "Installed Date",
       cell: ({ row }) => formatDate(row.original.startDate),
     },
     {

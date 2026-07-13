@@ -2,34 +2,21 @@
 
 import * as React from "react"
 import { useParams } from "next/navigation"
-import {
-  Mail,
-  MapPin,
-  Phone,
-  Wrench,
-  Droplet,
-  FileText,
-  Receipt,
-  Package,
-  Building2,
-  ShieldCheck,
-} from "lucide-react"
+import { Mail, MapPin, Phone, Wrench, Droplet, Building2, ShieldCheck } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Skeleton } from "@/components/ui/skeleton"
-import { ContractStatusBadge, PaymentStatusBadge } from "@/components/shared/status-badge"
+import { ContractStatusBadge } from "@/components/shared/status-badge"
 import { Logo } from "@/components/shared/logo"
 import { usePortalProfile } from "@/lib/hooks/use-portal"
-import { formatCurrency, formatDate, getContractStatus, initials, daysUntil } from "@/lib/utils"
+import { formatDate, getContractStatus, initials } from "@/lib/utils"
 import { getServiceHistory } from "@/lib/service-history"
 
 export default function CustomerPortalPage() {
   const params = useParams<{ id: string }>()
   const { data: profile, isPending } = usePortalProfile(params.id)
   const customer = profile?.customer
-  const customerSales = profile?.sales ?? []
-  const products = profile?.products ?? []
   const settings = profile?.settings
 
   const content = (() => {
@@ -53,21 +40,6 @@ export default function CustomerPortalPage() {
 
     const status = getContractStatus(customer.contractEnd)
     const serviceHistory = getServiceHistory(customer)
-    const installedProducts = new Map<string, { name: string; qty: number; lastPurchased: string }>()
-    customerSales.forEach((s) => {
-      s.items.forEach((it) => {
-        const product = products.find((p) => p.id === it.productId)
-        if (!product) return
-        const existing = installedProducts.get(product.id)
-        if (existing) {
-          existing.qty += it.quantity
-          if (s.date > existing.lastPurchased) existing.lastPurchased = s.date
-        } else {
-          installedProducts.set(product.id, { name: product.name, qty: it.quantity, lastPurchased: s.date })
-        }
-      })
-    })
-    const daysLeft = daysUntil(customer.contractEnd)
 
     return (
       <>
@@ -104,10 +76,7 @@ export default function CustomerPortalPage() {
         <Tabs defaultValue="personal">
           <TabsList className="flex-wrap h-auto group-data-horizontal/tabs:h-auto">
             <TabsTrigger value="personal">Personal Info</TabsTrigger>
-            <TabsTrigger value="contract">Contract Details</TabsTrigger>
             <TabsTrigger value="service">Service History</TabsTrigger>
-            <TabsTrigger value="payments">Payment History</TabsTrigger>
-            <TabsTrigger value="products">Installed Products</TabsTrigger>
           </TabsList>
 
           <TabsContent value="personal">
@@ -126,25 +95,6 @@ export default function CustomerPortalPage() {
                   value={customer.filterInstalled ? "Yes" : "No"}
                 />
                 <InfoRow icon={Wrench} label="Assigned Technician" value={customer.assignedTechnician || "N/A"} />
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="contract">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Contract Details</CardTitle>
-              </CardHeader>
-              <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                <InfoRow icon={FileText} label="Contract Number" value={customer.contractNumber} />
-                <InfoRow icon={FileText} label="Status" value={<ContractStatusBadge status={status} />} />
-                <InfoRow icon={FileText} label="Contract Start" value={formatDate(customer.contractStart)} />
-                <InfoRow icon={FileText} label="Contract End" value={formatDate(customer.contractEnd)} />
-                <InfoRow
-                  icon={FileText}
-                  label="Time Remaining"
-                  value={daysLeft >= 0 ? `${daysLeft} day(s) left` : `Expired ${Math.abs(daysLeft)} day(s) ago`}
-                />
               </CardContent>
             </Card>
           </TabsContent>
@@ -172,71 +122,6 @@ export default function CustomerPortalPage() {
                     </div>
                   </div>
                 ))}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="payments">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Payment History</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {customerSales.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No sales recorded for this customer yet.</p>
-                ) : (
-                  <div className="space-y-3">
-                    {customerSales.map((s) => (
-                      <div key={s.id} className="flex items-center justify-between border-b pb-3 last:border-0 last:pb-0">
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-secondary/10 text-secondary">
-                            <Receipt className="h-4 w-4" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium">{s.invoiceNumber}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {formatDate(s.date)} &middot; {s.paymentMethod}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-sm font-semibold">{formatCurrency(s.totalAmount)}</p>
-                          <PaymentStatusBadge status={s.paymentStatus} />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="products">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Installed Products</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {installedProducts.size === 0 ? (
-                  <p className="text-sm text-muted-foreground">No products purchased/installed yet.</p>
-                ) : (
-                  <div className="space-y-3">
-                    {Array.from(installedProducts.values()).map((p, i) => (
-                      <div key={i} className="flex items-center justify-between border-b pb-3 last:border-0 last:pb-0">
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-success/10 text-success">
-                            <Package className="h-4 w-4" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium">{p.name}</p>
-                            <p className="text-xs text-muted-foreground">Last purchased {formatDate(p.lastPurchased)}</p>
-                          </div>
-                        </div>
-                        <span className="text-sm font-semibold">x{p.qty}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
               </CardContent>
             </Card>
           </TabsContent>

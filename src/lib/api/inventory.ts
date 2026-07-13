@@ -141,10 +141,37 @@ export async function listStockMovements(): Promise<StockMovement[]> {
   return (data as StockMovementRow[]).map(movementFromRow)
 }
 
+export type StockMovementResult = {
+  movement: StockMovement
+  productName: string
+  stockQuantity: number
+  minStockLevel: number
+}
+
+// Reads the product's post-trigger stock level so callers can warn the admin right
+// when a movement pushes it down to (or past) its minimum — the trigger that keeps
+// stock_quantity in sync runs inside the same transaction as the insert/update, so
+// it's already reflected by the time this follow-up read happens.
+async function resultingProductStock(productId: string, movement: StockMovement): Promise<StockMovementResult> {
+  const { data, error } = await supabase
+    .from("products")
+    .select("name, stock_quantity, min_stock_level")
+    .eq("id", productId)
+    .single()
+  if (error) throw error
+  const product = data as { name: string; stock_quantity: number; min_stock_level: number }
+  return {
+    movement,
+    productName: product.name,
+    stockQuantity: product.stock_quantity,
+    minStockLevel: product.min_stock_level,
+  }
+}
+
 export async function addStockMovement(
   input: Omit<StockMovement, "id" | "createdAt">,
   actorId: string
-): Promise<StockMovement> {
+): Promise<StockMovementResult> {
   const { data, error } = await supabase
     .from("stock_movements")
     .insert({
@@ -161,7 +188,8 @@ export async function addStockMovement(
     .single()
   if (error) throw error
   await logActivity(actorId, "Inventory Updated")
-  return movementFromRow(data as StockMovementRow)
+  const movement = movementFromRow(data as StockMovementRow)
+  return resultingProductStock(movement.productId, movement)
 }
 
 // The product itself is never changed here (see stock-movement-form-dialog) — only
@@ -171,7 +199,7 @@ export async function updateStockMovement(
   id: string,
   input: Pick<StockMovement, "quantityAdded" | "quantityRemoved" | "secondHandQuantity" | "reason">,
   actorId: string
-): Promise<StockMovement> {
+): Promise<StockMovementResult> {
   const { data, error } = await supabase
     .from("stock_movements")
     .update({
@@ -185,7 +213,8 @@ export async function updateStockMovement(
     .single()
   if (error) throw error
   await logActivity(actorId, "Inventory Updated")
-  return movementFromRow(data as StockMovementRow)
+  const movement = movementFromRow(data as StockMovementRow)
+  return resultingProductStock(movement.productId, movement)
 }
 
 export async function deleteStockMovement(id: string, actorId: string): Promise<void> {

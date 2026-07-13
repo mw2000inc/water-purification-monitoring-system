@@ -9,7 +9,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { formatDateTime } from "@/lib/utils"
+import { StockStatusBadge } from "@/components/shared/status-badge"
+import { formatDateTime, getStockStatus } from "@/lib/utils"
 import type { StockMovement } from "@/lib/types"
 
 export type StockMovementRow = StockMovement & {
@@ -17,6 +18,7 @@ export type StockMovementRow = StockMovement & {
   sku: string
   actualStock: number
   currentStock: number
+  minStockLevel: number
   userName: string
 }
 
@@ -86,6 +88,15 @@ export function getStockMovementsColumns({
     {
       accessorKey: "actualStock",
       header: "Actual Stock",
+    },
+    {
+      id: "status",
+      header: "Status",
+      // Flags the moment a stock-reducing movement pushes the product down to (or
+      // past) its minimum level, so the admin sees the warning right on the ledger.
+      cell: ({ row }) => (
+        <StockStatusBadge status={getStockStatus(row.original.actualStock, row.original.minStockLevel)} />
+      ),
     },
     {
       accessorKey: "reason",
