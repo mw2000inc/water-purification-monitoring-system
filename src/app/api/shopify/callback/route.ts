@@ -35,6 +35,15 @@ export async function GET(request: Request) {
   const code = searchParams.get("code")
   const state = searchParams.get("state")
 
+  // TEMPORARY DEBUG — remove once the shop-mismatch issue is diagnosed.
+  // JSON.stringify reveals invisible characters (stray whitespace, smart
+  // quotes pasted into the Vercel env var field, etc.) that a visual check
+  // of the dashboard value wouldn't catch.
+  console.log("[SHOPIFY_DEBUG] full callback URL:", request.url)
+  console.log("[SHOPIFY_DEBUG] returnedShop:", JSON.stringify(returnedShop), "length:", returnedShop?.length)
+  console.log("[SHOPIFY_DEBUG] env SHOPIFY_SHOP_DOMAIN:", JSON.stringify(shop), "length:", shop?.length)
+  console.log("[SHOPIFY_DEBUG] strict equal:", returnedShop === shop)
+
   // Only ever accept a callback for the one store this app is wired to —
   // this is a single-tenant custom app, not a public multi-store app.
   if (returnedShop !== shop) {
