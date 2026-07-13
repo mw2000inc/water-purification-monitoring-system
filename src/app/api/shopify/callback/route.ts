@@ -36,12 +36,15 @@ export async function GET(request: Request) {
   const state = searchParams.get("state")
 
   // TEMPORARY DEBUG — remove once the shop-mismatch issue is diagnosed.
-  // JSON.stringify reveals invisible characters (stray whitespace, smart
-  // quotes pasted into the Vercel env var field, etc.) that a visual check
-  // of the dashboard value wouldn't catch.
+  // Brackets make leading/trailing whitespace visible at a glance; char
+  // codes catch anything invisible even brackets wouldn't show (e.g. a
+  // non-breaking space U+00A0 looks identical to a normal space U+0020).
+  const charCodes = (v: string | null) => (v ? Array.from(v).map((c) => c.charCodeAt(0)) : null)
   console.log("[SHOPIFY_DEBUG] full callback URL:", request.url)
-  console.log("[SHOPIFY_DEBUG] returnedShop:", JSON.stringify(returnedShop), "length:", returnedShop?.length)
-  console.log("[SHOPIFY_DEBUG] env SHOPIFY_SHOP_DOMAIN:", JSON.stringify(shop), "length:", shop?.length)
+  console.log(`[SHOPIFY_DEBUG] returnedShop: [${returnedShop}] length:`, returnedShop?.length)
+  console.log("[SHOPIFY_DEBUG] returnedShop char codes:", JSON.stringify(charCodes(returnedShop)))
+  console.log(`[SHOPIFY_DEBUG] env SHOPIFY_SHOP_DOMAIN: [${shop}] length:`, shop?.length)
+  console.log("[SHOPIFY_DEBUG] env char codes:", JSON.stringify(charCodes(shop)))
   console.log("[SHOPIFY_DEBUG] strict equal:", returnedShop === shop)
 
   // Only ever accept a callback for the one store this app is wired to —
