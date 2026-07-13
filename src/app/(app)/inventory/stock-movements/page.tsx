@@ -17,24 +17,28 @@ import { Calendar } from "@/components/ui/calendar"
 import { Card, CardContent } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { DataTable } from "@/components/data-table/data-table"
+import { ConfirmDialog } from "@/components/shared/confirm-dialog"
 import { StockMovementFormDialog } from "@/components/inventory/stock-movement-form-dialog"
-import { stockMovementsColumns, type StockMovementRow } from "@/components/inventory/stock-movements-columns"
-import { useProducts, useStockMovements } from "@/lib/hooks/use-inventory"
+import { getStockMovementsColumns, type StockMovementRow } from "@/components/inventory/stock-movements-columns"
+import { useDeleteStockMovement, useProducts, useStockMovements } from "@/lib/hooks/use-inventory"
 import { useUsers } from "@/lib/hooks/use-misc"
 import { useAuth } from "@/lib/auth/auth-context"
 import { cn, formatDate } from "@/lib/utils"
 
 export default function StockMovementsPage() {
-  const { can } = useAuth()
+  const { user, can } = useAuth()
   const { data: movements = [], isPending: p1 } = useStockMovements()
   const { data: products = [], isPending: p2 } = useProducts()
   const { data: users = [], isPending: p3 } = useUsers()
+  const deleteMovement = useDeleteStockMovement(user?.id ?? "")
 
   const [productFilter, setProductFilter] = React.useState<string>("all")
   const [userFilter, setUserFilter] = React.useState<string>("all")
   const [selectedDate, setSelectedDate] = React.useState<string | undefined>(undefined)
   const [calendarOpen, setCalendarOpen] = React.useState(false)
   const [formOpen, setFormOpen] = React.useState(false)
+  const [editing, setEditing] = React.useState<StockMovementRow | undefined>(undefined)
+  const [deleting, setDeleting] = React.useState<StockMovementRow | undefined>(undefined)
 
   const isPending = p1 || p2 || p3
 
@@ -98,6 +102,20 @@ export default function StockMovementsPage() {
     })
   }, [rows, productFilter, userFilter, selectedDate])
 
+  const columns = React.useMemo(
+    () =>
+      getStockMovementsColumns({
+        canEdit: can("inventory:edit"),
+        canDelete: can("inventory:delete"),
+        onEdit: (m) => {
+          setEditing(m)
+          setFormOpen(true)
+        },
+        onDelete: (m) => setDeleting(m),
+      }),
+    [can]
+  )
+
   if (isPending) {
     return (
       <div className="space-y-4">
@@ -119,7 +137,13 @@ export default function StockMovementsPage() {
           </p>
         </div>
         {can("inventory:add") && (
-          <Button onClick={() => setFormOpen(true)} className="gap-1.5">
+          <Button
+            onClick={() => {
+              setEditing(undefined)
+              setFormOpen(true)
+            }}
+            className="gap-1.5"
+          >
             <Plus className="h-4 w-4" /> Add Stock Movement
           </Button>
         )}
@@ -172,7 +196,7 @@ export default function StockMovementsPage() {
       <Card>
         <CardContent className="pt-6">
           <DataTable
-            columns={stockMovementsColumns}
+            columns={columns}
             data={scopedRows}
             searchPlaceholder="Search by SKU, product name, or date..."
             emptyMessage="No stock movements found."
@@ -210,7 +234,20 @@ export default function StockMovementsPage() {
         </CardContent>
       </Card>
 
-      <StockMovementFormDialog open={formOpen} onOpenChange={setFormOpen} />
+      <StockMovementFormDialog open={formOpen} onOpenChange={setFormOpen} movement={editing} />
+
+      <ConfirmDialog
+        open={!!deleting}
+        onOpenChange={(o) => !o && setDeleting(undefined)}
+        title="Delete stock movement?"
+        description={`This will permanently remove this movement and adjust ${deleting?.productName ?? "the product"}'s stock accordingly.`}
+        loading={deleteMovement.isPending}
+        onConfirm={async () => {
+          if (!deleting) return
+          await deleteMovement.mutateAsync(deleting.id)
+          setDeleting(undefined)
+        }}
+      />
     </div>
   )
 }

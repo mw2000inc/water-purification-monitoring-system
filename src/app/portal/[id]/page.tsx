@@ -20,19 +20,17 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ContractStatusBadge, PaymentStatusBadge } from "@/components/shared/status-badge"
 import { Logo } from "@/components/shared/logo"
-import { useCustomer } from "@/lib/hooks/use-customers"
-import { useSales } from "@/lib/hooks/use-sales"
-import { useProducts } from "@/lib/hooks/use-inventory"
-import { useSettings } from "@/lib/hooks/use-misc"
+import { usePortalProfile } from "@/lib/hooks/use-portal"
 import { formatCurrency, formatDate, getContractStatus, initials, daysUntil } from "@/lib/utils"
 import { getServiceHistory } from "@/lib/service-history"
 
 export default function CustomerPortalPage() {
   const params = useParams<{ id: string }>()
-  const { data: customer, isPending } = useCustomer(params.id)
-  const { data: sales = [] } = useSales()
-  const { data: products = [] } = useProducts()
-  const { data: settings } = useSettings()
+  const { data: profile, isPending } = usePortalProfile(params.id)
+  const customer = profile?.customer
+  const customerSales = profile?.sales ?? []
+  const products = profile?.products ?? []
+  const settings = profile?.settings
 
   const content = (() => {
     if (isPending) {
@@ -54,7 +52,6 @@ export default function CustomerPortalPage() {
     }
 
     const status = getContractStatus(customer.contractEnd)
-    const customerSales = sales.filter((s) => s.customerId === customer.id)
     const serviceHistory = getServiceHistory(customer)
     const installedProducts = new Map<string, { name: string; qty: number; lastPurchased: string }>()
     customerSales.forEach((s) => {

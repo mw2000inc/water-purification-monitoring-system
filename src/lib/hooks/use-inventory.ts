@@ -86,3 +86,38 @@ export function useAddStockMovement(actorId: string) {
     onError: () => toast.error("Failed to record stock movement"),
   })
 }
+
+export function useUpdateStockMovement(actorId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      id,
+      input,
+    }: {
+      id: string
+      input: Pick<StockMovement, "quantityAdded" | "quantityRemoved" | "secondHandQuantity" | "reason">
+    }) => api.updateStockMovement(id, input, actorId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: stockMovementsKey })
+      qc.invalidateQueries({ queryKey: productsKey })
+      qc.invalidateQueries({ queryKey: ["notifications"] })
+      qc.invalidateQueries({ queryKey: ["activityLogs"] })
+      toast.success("Stock movement updated")
+    },
+    onError: (error: Error) => toast.error(error.message || "Failed to update stock movement"),
+  })
+}
+
+export function useDeleteStockMovement(actorId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.deleteStockMovement(id, actorId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: stockMovementsKey })
+      qc.invalidateQueries({ queryKey: productsKey })
+      qc.invalidateQueries({ queryKey: ["activityLogs"] })
+      toast.success("Stock movement deleted")
+    },
+    onError: (error: Error) => toast.error(error.message || "Failed to delete stock movement"),
+  })
+}

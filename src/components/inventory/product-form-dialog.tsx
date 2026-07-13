@@ -113,6 +113,7 @@ export function ProductFormDialog({
         min={0}
         step={step}
         aria-invalid={!!errors[name]}
+        onFocus={(e) => e.target.select()}
         {...form.register(name, { valueAsNumber: true })}
       />
       {errors[name] && <p className="text-destructive text-sm">{errors[name]?.message as string}</p>}
@@ -122,7 +123,10 @@ export function ProductFormDialog({
   return (
     <>
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+      <DialogContent
+        className="sm:max-w-2xl max-h-[85vh] overflow-y-auto"
+        onInteractOutside={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle>{isEdit ? "Edit Product" : "Add Product"}</DialogTitle>
           <DialogDescription>

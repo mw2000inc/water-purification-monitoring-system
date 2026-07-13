@@ -12,7 +12,7 @@ import { useContracts } from "@/lib/hooks/use-contracts"
 import { useCustomers } from "@/lib/hooks/use-customers"
 import { daysUntil, getNextQuarterlyDate } from "@/lib/utils"
 import type { MonitoringStatus } from "@/lib/types"
-import { format, parseISO, subMonths } from "date-fns"
+import { addMonths, format, parseISO, subMonths } from "date-fns"
 
 type StatusTab = "all" | MonitoringStatus
 
@@ -28,21 +28,27 @@ export default function ContractsPage() {
   const rows: ContractRow[] = React.useMemo(() => {
     return contracts.map((c) => {
       const customer = customers.find((cust) => cust.id === c.customerId)
-      // The current quarterly cycle: end is the next checkpoint on/after today,
-      // start is exactly 3 months before that, so the two always stay 3 months apart.
+      // The current quarterly cycle: the 3-month checkpoint is the next one on/after
+      // today, start is exactly 3 months before that — every checkpoint from there on
+      // (3/6/9 months) stays exactly 3 months apart from the last.
       const periodEnd = getNextQuarterlyDate(c.startDate)
       const periodStart = subMonths(periodEnd, 3)
-      const nextEndDate = format(periodEnd, "yyyy-MM-dd")
+      const threeMonthDate = format(periodEnd, "yyyy-MM-dd")
+      const sixMonthDate = format(addMonths(periodEnd, 3), "yyyy-MM-dd")
+      const nineMonthDate = format(addMonths(periodEnd, 6), "yyyy-MM-dd")
       const startDate = format(periodStart, "yyyy-MM-dd")
-      const daysRemaining = daysUntil(nextEndDate)
+      // The cycle isn't done until the final (9-month) checkpoint has passed.
+      const daysRemaining = daysUntil(nineMonthDate)
       return {
         ...c,
         startDate,
         orderNumber: customer?.orderNumber ?? "N/A",
         customerName: customer?.fullName ?? "Unknown",
         companyName: customer?.companyName,
-        nextEndDate,
-        // Automatically flips once the end date has arrived (or passed) today.
+        threeMonthDate,
+        sixMonthDate,
+        nineMonthDate,
+        // Automatically flips once the final checkpoint has arrived (or passed) today.
         status: daysRemaining <= 0 ? "for-replacement" : "active",
       }
     })
@@ -58,14 +64,14 @@ export default function ContractsPage() {
   )
 
   const years = React.useMemo(
-    () => Array.from(new Set(rows.map((c) => parseISO(c.nextEndDate).getFullYear()))).sort((a, b) => b - a),
+    () => Array.from(new Set(rows.map((c) => parseISO(c.threeMonthDate).getFullYear()))).sort((a, b) => b - a),
     [rows]
   )
 
   const scopedRows = React.useMemo(() => {
     return rows.filter((r) => {
       if (statusTab !== "all" && r.status !== statusTab) return false
-      const end = parseISO(r.nextEndDate)
+      const end = parseISO(r.threeMonthDate)
       if (monthYear.month !== "all" && end.getMonth() !== Number(monthYear.month)) return false
       if (monthYear.year !== "all" && end.getFullYear() !== Number(monthYear.year)) return false
       return true

@@ -1,10 +1,18 @@
 import { supabase } from "@/lib/supabase/client"
 import { logActivity } from "@/lib/api/activity"
-import type { Sale, SaleItem } from "@/lib/types"
+import type { Sale, SaleItem, SaleService } from "@/lib/types"
 
 type SaleItemRow = {
   id: string
   product_id: string
+  quantity: number
+  unit_price: number
+  subtotal: number
+}
+
+type SaleServiceRow = {
+  id: string
+  name: string
   quantity: number
   unit_price: number
   subtotal: number
@@ -21,12 +29,23 @@ type SaleRow = {
   payment_method: string
   payment_status: string
   sale_items: SaleItemRow[]
+  sale_services: SaleServiceRow[]
 }
 
 function itemFromRow(row: SaleItemRow): SaleItem {
   return {
     id: row.id,
     productId: row.product_id,
+    quantity: row.quantity,
+    unitPrice: Number(row.unit_price),
+    subtotal: Number(row.subtotal),
+  }
+}
+
+function serviceFromRow(row: SaleServiceRow): SaleService {
+  return {
+    id: row.id,
+    name: row.name,
     quantity: row.quantity,
     unitPrice: Number(row.unit_price),
     subtotal: Number(row.subtotal),
@@ -41,6 +60,7 @@ function fromRow(row: SaleRow): Sale {
     customerId: row.customer_id,
     salesRepId: row.sales_rep_id,
     items: (row.sale_items ?? []).map(itemFromRow),
+    services: (row.sale_services ?? []).map(serviceFromRow),
     discount: Number(row.discount),
     totalAmount: Number(row.total_amount),
     paymentMethod: row.payment_method as Sale["paymentMethod"],
@@ -48,7 +68,7 @@ function fromRow(row: SaleRow): Sale {
   }
 }
 
-function saleFieldsToRow(input: Partial<Omit<Sale, "id" | "invoiceNumber" | "items">>) {
+function saleFieldsToRow(input: Partial<Omit<Sale, "id" | "invoiceNumber" | "items" | "services">>) {
   const row: Record<string, unknown> = {}
   if (input.date !== undefined) row.date = input.date
   if (input.customerId !== undefined) row.customer_id = input.customerId
@@ -60,7 +80,7 @@ function saleFieldsToRow(input: Partial<Omit<Sale, "id" | "invoiceNumber" | "ite
   return row
 }
 
-const SALE_SELECT = "*, sale_items(*)"
+const SALE_SELECT = "*, sale_items(*), sale_services(*)"
 
 export async function listSales(): Promise<Sale[]> {
   const { data, error } = await supabase.from("sales").select(SALE_SELECT).order("date", { ascending: false })
@@ -93,18 +113,33 @@ export async function createSale(input: Omit<Sale, "id" | "invoiceNumber">, acto
   const { error: itemsError } = await supabase.from("sale_items").insert(itemRows)
   if (itemsError) throw itemsError
 
+  if (input.services.length > 0) {
+    const serviceRows = input.services.map((s) => ({
+      sale_id: sale.id,
+      name: s.name,
+      quantity: s.quantity,
+      unit_price: s.unitPrice,
+      subtotal: s.subtotal,
+    }))
+    // Services have no stock impact — no trigger fires for these inserts.
+    const { error: servicesError } = await supabase.from("sale_services").insert(serviceRows)
+    if (servicesError) throw servicesError
+  }
+
   await logActivity(actorId, "Sale Added")
   return (await getSale(sale.id)) as Sale
 }
 
 // Editing a sale only ever updates existing line items in place (quantity/price),
 // matching the mock store's original behavior — stock is never recalculated here.
+// Services have no stock side-effect to worry about, so they're simply replaced
+// wholesale (delete then re-insert) to support adding/removing service lines too.
 export async function updateSale(
   id: string,
   input: Partial<Omit<Sale, "id" | "invoiceNumber">>,
   actorId: string
 ): Promise<Sale> {
-  const { items, ...saleFields } = input
+  const { items, services, ...saleFields } = input
   if (Object.keys(saleFields).length > 0) {
     const { error } = await supabase.from("sales").update(saleFieldsToRow(saleFields)).eq("id", id)
     if (error) throw error
@@ -116,6 +151,21 @@ export async function updateSale(
         .from("sale_items")
         .update({ product_id: item.productId, quantity: item.quantity, unit_price: item.unitPrice, subtotal: item.subtotal })
         .eq("id", item.id)
+    }
+  }
+  if (services) {
+    const { error: deleteError } = await supabase.from("sale_services").delete().eq("sale_id", id)
+    if (deleteError) throw deleteError
+    if (services.length > 0) {
+      const serviceRows = services.map((s) => ({
+        sale_id: id,
+        name: s.name,
+        quantity: s.quantity,
+        unit_price: s.unitPrice,
+        subtotal: s.subtotal,
+      }))
+      const { error: insertError } = await supabase.from("sale_services").insert(serviceRows)
+      if (insertError) throw insertError
     }
   }
   await logActivity(actorId, "Sale Edited")

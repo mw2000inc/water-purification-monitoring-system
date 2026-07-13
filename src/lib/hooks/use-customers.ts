@@ -20,7 +20,8 @@ export function useCustomer(id: string | undefined) {
 export function useCreateCustomer(actorId: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (input: Omit<Customer, "id" | "createdAt" | "orderNumber">) => api.createCustomer(input, actorId),
+    mutationFn: (input: Omit<Customer, "id" | "createdAt" | "orderNumber" | "contractNumber"> & { contractNumber?: string }) =>
+      api.createCustomer(input, actorId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: customersKey })
       qc.invalidateQueries({ queryKey: ["contracts"] })

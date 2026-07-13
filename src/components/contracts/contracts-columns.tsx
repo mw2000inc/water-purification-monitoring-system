@@ -10,7 +10,9 @@ export type ContractRow = Contract & {
   orderNumber: string
   customerName: string
   companyName?: string
-  nextEndDate: string
+  threeMonthDate: string
+  sixMonthDate: string
+  nineMonthDate: string
   status: MonitoringStatus
 }
 
@@ -49,9 +51,19 @@ export function getContractColumns(): ColumnDef<ContractRow, unknown>[] {
       cell: ({ row }) => formatDate(row.original.startDate),
     },
     {
-      accessorKey: "nextEndDate",
-      header: "End Date",
-      cell: ({ row }) => formatDate(row.original.nextEndDate),
+      accessorKey: "threeMonthDate",
+      header: "3 Months",
+      cell: ({ row }) => formatDate(row.original.threeMonthDate),
+    },
+    {
+      accessorKey: "sixMonthDate",
+      header: "6 Months",
+      cell: ({ row }) => formatDate(row.original.sixMonthDate),
+    },
+    {
+      accessorKey: "nineMonthDate",
+      header: "9 Months",
+      cell: ({ row }) => formatDate(row.original.nineMonthDate),
     },
   ]
 }

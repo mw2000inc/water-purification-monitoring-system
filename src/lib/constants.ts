@@ -8,6 +8,10 @@ export const DISPENSER_TYPES = [
 export const TECHNICIANS = [
   "Joselito Compereso",
   "Jerson Capellon",
+  "Jayson Sapitin",
+  "Eubert Montalbo",
+  "Jason Pabalan",
+  "Jeric Salirio",
   "N/A",
 ] as const
 

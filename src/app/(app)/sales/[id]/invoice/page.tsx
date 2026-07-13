@@ -47,7 +47,8 @@ export default function InvoicePage() {
 
   const customer = customers.find((c) => c.id === sale.customerId)
   const rep = users.find((u) => u.id === sale.salesRepId)
-  const gross = sale.items.reduce((s, it) => s + it.subtotal, 0)
+  const gross =
+    sale.items.reduce((s, it) => s + it.subtotal, 0) + sale.services.reduce((s, sv) => s + sv.subtotal, 0)
 
   return (
     <div className="max-w-3xl mx-auto space-y-4">
@@ -115,6 +116,14 @@ export default function InvoicePage() {
                   </tr>
                 )
               })}
+              {sale.services.map((service) => (
+                <tr key={service.id} className="border-b last:border-0">
+                  <td className="py-2">{service.name}</td>
+                  <td className="py-2 text-right">{service.quantity}</td>
+                  <td className="py-2 text-right">{formatCurrency(service.unitPrice)}</td>
+                  <td className="py-2 text-right">{formatCurrency(service.subtotal)}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
 

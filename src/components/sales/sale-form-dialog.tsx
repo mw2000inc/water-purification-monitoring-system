@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { useFieldArray, useForm } from "react-hook-form"
 import { useQueryClient } from "@tanstack/react-query"
 import { Plus, Trash2, UserPlus } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Dialog,
   DialogContent,
@@ -16,6 +17,7 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import {
   Form,
   FormControl,
@@ -50,11 +52,19 @@ const itemSchema = z.object({
   unitPrice: z.number().min(0),
 })
 
+const serviceSchema = z.object({
+  name: z.string().min(1, "Service name is required"),
+  quantity: z.number().int().min(1, "Min 1"),
+  unitPrice: z.number().min(0),
+})
+
 const schema = z.object({
   customerId: z.string().min(1, "Select a customer"),
   salesRepId: z.string().min(1, "Select a sales representative"),
   date: z.string().min(1, "Date is required"),
   items: z.array(itemSchema).min(1, "Add at least one product"),
+  hasServices: z.boolean(),
+  services: z.array(serviceSchema),
   discountPercent: z.number().min(0).max(100),
   paymentMethod: z.enum(PAYMENT_METHODS),
   paymentStatus: z.enum(PAYMENT_STATUSES),
@@ -81,7 +91,9 @@ export function SaleFormDialog({
   const isEdit = !!sale
   const [newCustomerOpen, setNewCustomerOpen] = React.useState(false)
 
-  const gross0 = sale ? sale.items.reduce((s, it) => s + it.subtotal, 0) : 0
+  const grossOf = (s?: Sale) =>
+    s ? s.items.reduce((sum, it) => sum + it.subtotal, 0) + s.services.reduce((sum, sv) => sum + sv.subtotal, 0) : 0
+  const gross0 = grossOf(sale)
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -94,6 +106,12 @@ export function SaleFormDialog({
         quantity: it.quantity,
         unitPrice: it.unitPrice,
       })) ?? [{ productId: "", quantity: 1, unitPrice: 0 }],
+      hasServices: !!sale && sale.services.length > 0,
+      services: sale?.services.map((sv) => ({
+        name: sv.name,
+        quantity: sv.quantity,
+        unitPrice: sv.unitPrice,
+      })) ?? [{ name: "Installation/Delivery", quantity: 1, unitPrice: 0 }],
       discountPercent: sale && gross0 > 0 ? Math.round((sale.discount / gross0) * 100) : 0,
       paymentMethod: sale?.paymentMethod ?? "Cash",
       paymentStatus: sale?.paymentStatus ?? "Paid",
@@ -102,7 +120,7 @@ export function SaleFormDialog({
 
   React.useEffect(() => {
     if (open) {
-      const gross = sale ? sale.items.reduce((s, it) => s + it.subtotal, 0) : 0
+      const gross = grossOf(sale)
       form.reset({
         customerId: sale?.customerId ?? "",
         salesRepId: sale?.salesRepId ?? user?.id ?? "",
@@ -112,6 +130,12 @@ export function SaleFormDialog({
           quantity: it.quantity,
           unitPrice: it.unitPrice,
         })) ?? [{ productId: "", quantity: 1, unitPrice: 0 }],
+        hasServices: !!sale && sale.services.length > 0,
+        services: sale?.services.map((sv) => ({
+          name: sv.name,
+          quantity: sv.quantity,
+          unitPrice: sv.unitPrice,
+        })) ?? [{ name: "Installation/Delivery", quantity: 1, unitPrice: 0 }],
         discountPercent: sale && gross > 0 ? Math.round((sale.discount / gross) * 100) : 0,
         paymentMethod: sale?.paymentMethod ?? "Cash",
         paymentStatus: sale?.paymentStatus ?? "Paid",
@@ -121,10 +145,21 @@ export function SaleFormDialog({
   }, [open, sale])
 
   const { fields, append, remove } = useFieldArray({ control: form.control, name: "items" })
+  const {
+    fields: serviceFields,
+    append: appendService,
+    remove: removeService,
+  } = useFieldArray({ control: form.control, name: "services" })
   const watchedItems = form.watch("items")
+  const watchedServices = form.watch("services")
+  const watchedHasServices = form.watch("hasServices")
   const watchedDiscountPercent = form.watch("discountPercent")
 
-  const gross = watchedItems.reduce((sum, it) => sum + (it.quantity || 0) * (it.unitPrice || 0), 0)
+  const itemsGrossLive = watchedItems.reduce((sum, it) => sum + (it.quantity || 0) * (it.unitPrice || 0), 0)
+  const servicesGrossLive = watchedHasServices
+    ? watchedServices.reduce((sum, sv) => sum + (sv.quantity || 0) * (sv.unitPrice || 0), 0)
+    : 0
+  const gross = itemsGrossLive + servicesGrossLive
   const discountAmount = Math.round(gross * ((watchedDiscountPercent || 0) / 100))
   const totalAmount = gross - discountAmount
 
@@ -136,7 +171,16 @@ export function SaleFormDialog({
       unitPrice: it.unitPrice,
       subtotal: it.quantity * it.unitPrice,
     }))
-    const itemsGross = items.reduce((s, it) => s + it.subtotal, 0)
+    const services = values.hasServices
+      ? values.services.map((sv) => ({
+          id: sale?.services.find((x) => x.name === sv.name)?.id ?? `svc-${Math.random().toString(36).slice(2, 9)}`,
+          name: sv.name,
+          quantity: sv.quantity,
+          unitPrice: sv.unitPrice,
+          subtotal: sv.quantity * sv.unitPrice,
+        }))
+      : []
+    const itemsGross = items.reduce((s, it) => s + it.subtotal, 0) + services.reduce((s, sv) => s + sv.subtotal, 0)
     const discount = Math.round(itemsGross * (values.discountPercent / 100))
     const totalAmount = itemsGross - discount
 
@@ -145,6 +189,7 @@ export function SaleFormDialog({
       salesRepId: values.salesRepId,
       date: values.date,
       items,
+      services,
       discount,
       totalAmount,
       paymentMethod: values.paymentMethod,
@@ -164,7 +209,10 @@ export function SaleFormDialog({
   return (
     <>
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-3xl max-h-[85vh] overflow-y-auto">
+      <DialogContent
+        className="sm:max-w-3xl max-h-[85vh] overflow-y-auto"
+        onInteractOutside={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle>{isEdit ? "Edit Sale" : "Add Sale"}</DialogTitle>
           <DialogDescription>
@@ -265,9 +313,20 @@ export function SaleFormDialog({
                   <Plus className="h-3.5 w-3.5" /> Add Item
                 </Button>
               </div>
+              <div className="hidden sm:flex gap-2 px-2 text-xs font-medium text-muted-foreground">
+                <span className="w-6 shrink-0" />
+                <span className="flex-1">Product Name</span>
+                <span className="w-24">Quantity</span>
+                <span className="w-32">Price</span>
+                <span className="w-28 text-right pr-1">Subtotal</span>
+                <span className="w-9 shrink-0" />
+              </div>
               <div className="space-y-2">
                 {fields.map((field, index) => (
                   <div key={field.id} className="flex flex-col sm:flex-row gap-2 items-start sm:items-center border rounded-md p-2">
+                    <span className="hidden sm:flex h-8 w-6 shrink-0 items-center justify-center text-sm text-muted-foreground">
+                      {index + 1}
+                    </span>
                     <FormField
                       control={form.control}
                       name={`items.${index}.productId`}
@@ -298,43 +357,37 @@ export function SaleFormDialog({
                         </FormItem>
                       )}
                     />
-                    <FormField
-                      control={form.control}
-                      name={`items.${index}.quantity`}
-                      render={({ field: f }) => (
-                        <FormItem className="w-full sm:w-24">
-                          <FormControl>
-                            <Input
-                              type="number"
-                              min={1}
-                              placeholder="Qty"
-                              value={f.value}
-                              onChange={(e) => f.onChange(e.target.valueAsNumber || 0)}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
+                    <div className="w-full sm:w-24">
+                      <Input
+                        type="number"
+                        min={1}
+                        placeholder="Qty"
+                        aria-invalid={!!form.formState.errors.items?.[index]?.quantity}
+                        onFocus={(e) => e.target.select()}
+                        {...form.register(`items.${index}.quantity`, { valueAsNumber: true })}
+                      />
+                      {form.formState.errors.items?.[index]?.quantity && (
+                        <p className="text-destructive text-sm">
+                          {form.formState.errors.items[index]?.quantity?.message}
+                        </p>
                       )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name={`items.${index}.unitPrice`}
-                      render={({ field: f }) => (
-                        <FormItem className="w-full sm:w-32">
-                          <FormControl>
-                            <Input
-                              type="number"
-                              min={0}
-                              step="0.01"
-                              placeholder="Unit Price"
-                              value={f.value}
-                              onChange={(e) => f.onChange(e.target.valueAsNumber || 0)}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
+                    </div>
+                    <div className="w-full sm:w-32">
+                      <Input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        placeholder="Unit Price"
+                        aria-invalid={!!form.formState.errors.items?.[index]?.unitPrice}
+                        onFocus={(e) => e.target.select()}
+                        {...form.register(`items.${index}.unitPrice`, { valueAsNumber: true })}
+                      />
+                      {form.formState.errors.items?.[index]?.unitPrice && (
+                        <p className="text-destructive text-sm">
+                          {form.formState.errors.items[index]?.unitPrice?.message}
+                        </p>
                       )}
-                    />
+                    </div>
                     <div className="w-full sm:w-28 text-sm font-medium text-right pr-1">
                       {formatCurrency((watchedItems[index]?.quantity || 0) * (watchedItems[index]?.unitPrice || 0))}
                     </div>
@@ -356,26 +409,131 @@ export function SaleFormDialog({
               )}
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <FormField
-                control={form.control}
-                name="discountPercent"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Discount (%)</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        min={0}
-                        max={100}
-                        value={field.value}
-                        onChange={(e) => field.onChange(e.target.valueAsNumber || 0)}
+            <FormField
+              control={form.control}
+              name="hasServices"
+              render={({ field }) => (
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <Checkbox
+                    checked={field.value}
+                    onCheckedChange={(v) => {
+                      const checked = v === true
+                      field.onChange(checked)
+                      if (checked && serviceFields.length === 0) {
+                        appendService({ name: "Installation/Delivery", quantity: 1, unitPrice: 0 })
+                      }
+                    }}
+                  />
+                  Add a service (Installation/Delivery, etc.)
+                </label>
+              )}
+            />
+
+            {watchedHasServices && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <FormLabel>Services</FormLabel>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={() => appendService({ name: "", quantity: 1, unitPrice: 0 })}
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Add Service
+                  </Button>
+                </div>
+                <div className="hidden sm:flex gap-2 px-2 text-xs font-medium text-muted-foreground">
+                  <span className="w-6 shrink-0" />
+                  <span className="flex-1">Service Name</span>
+                  <span className="w-24">Quantity</span>
+                  <span className="w-32">Price</span>
+                  <span className="w-28 text-right pr-1">Subtotal</span>
+                  <span className="w-9 shrink-0" />
+                </div>
+                <div className="space-y-2">
+                  {serviceFields.map((field, index) => (
+                    <div key={field.id} className="flex flex-col sm:flex-row gap-2 items-start sm:items-center border rounded-md p-2">
+                      <span className="hidden sm:flex h-8 w-6 shrink-0 items-center justify-center text-sm text-muted-foreground">
+                        {index + 1}
+                      </span>
+                      <FormField
+                        control={form.control}
+                        name={`services.${index}.name`}
+                        render={({ field: f }) => (
+                          <FormItem className="flex-1 w-full">
+                            <FormControl>
+                              <Input placeholder="Service name" {...f} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
                       />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
+                      <div className="w-full sm:w-24">
+                        <Input
+                          type="number"
+                          min={1}
+                          placeholder="Qty"
+                          aria-invalid={!!form.formState.errors.services?.[index]?.quantity}
+                          onFocus={(e) => e.target.select()}
+                          {...form.register(`services.${index}.quantity`, { valueAsNumber: true })}
+                        />
+                        {form.formState.errors.services?.[index]?.quantity && (
+                          <p className="text-destructive text-sm">
+                            {form.formState.errors.services[index]?.quantity?.message}
+                          </p>
+                        )}
+                      </div>
+                      <div className="w-full sm:w-32">
+                        <Input
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          placeholder="Price"
+                          aria-invalid={!!form.formState.errors.services?.[index]?.unitPrice}
+                          onFocus={(e) => e.target.select()}
+                          {...form.register(`services.${index}.unitPrice`, { valueAsNumber: true })}
+                        />
+                        {form.formState.errors.services?.[index]?.unitPrice && (
+                          <p className="text-destructive text-sm">
+                            {form.formState.errors.services[index]?.unitPrice?.message}
+                          </p>
+                        )}
+                      </div>
+                      <div className="w-full sm:w-28 text-sm font-medium text-right pr-1">
+                        {formatCurrency((watchedServices[index]?.quantity || 0) * (watchedServices[index]?.unitPrice || 0))}
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="text-danger shrink-0"
+                        disabled={serviceFields.length === 1}
+                        onClick={() => removeService(index)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid gap-2">
+                <Label>Discount (%)</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={100}
+                  aria-invalid={!!form.formState.errors.discountPercent}
+                  onFocus={(e) => e.target.select()}
+                  {...form.register("discountPercent", { valueAsNumber: true })}
+                />
+                {form.formState.errors.discountPercent && (
+                  <p className="text-destructive text-sm">{form.formState.errors.discountPercent.message}</p>
                 )}
-              />
+              </div>
               <FormField
                 control={form.control}
                 name="paymentMethod"

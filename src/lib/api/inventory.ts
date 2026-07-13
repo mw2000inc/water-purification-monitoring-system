@@ -163,3 +163,34 @@ export async function addStockMovement(
   await logActivity(actorId, "Inventory Updated")
   return movementFromRow(data as StockMovementRow)
 }
+
+// The product itself is never changed here (see stock-movement-form-dialog) — only
+// quantity/reason/2nd-hand fields. A DB trigger reverses the old quantity delta and
+// applies the new one so products.stock_quantity stays in sync with the edit.
+export async function updateStockMovement(
+  id: string,
+  input: Pick<StockMovement, "quantityAdded" | "quantityRemoved" | "secondHandQuantity" | "reason">,
+  actorId: string
+): Promise<StockMovement> {
+  const { data, error } = await supabase
+    .from("stock_movements")
+    .update({
+      quantity_added: input.quantityAdded,
+      quantity_removed: input.quantityRemoved,
+      second_hand_quantity: input.secondHandQuantity,
+      reason: input.reason,
+    })
+    .eq("id", id)
+    .select()
+    .single()
+  if (error) throw error
+  await logActivity(actorId, "Inventory Updated")
+  return movementFromRow(data as StockMovementRow)
+}
+
+export async function deleteStockMovement(id: string, actorId: string): Promise<void> {
+  // A DB trigger reverses this movement's effect on products.stock_quantity.
+  const { error } = await supabase.from("stock_movements").delete().eq("id", id)
+  if (error) throw error
+  await logActivity(actorId, "Inventory Updated")
+}

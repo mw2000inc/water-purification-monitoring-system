@@ -16,8 +16,10 @@ const VISIT_TYPES = [
   "Repair Visit",
 ]
 
+type ServiceHistoryCustomer = Pick<Customer, "contractStart" | "contractEnd" | "assignedTechnician" | "dispenserType">
+
 // Deterministic, derived service schedule (every ~90 days since contract start) — not a persisted entity.
-export function getServiceHistory(customer: Customer, now: Date = new Date()): ServiceVisit[] {
+export function getServiceHistory(customer: ServiceHistoryCustomer, now: Date = new Date()): ServiceVisit[] {
   const start = parseISO(customer.contractStart)
   const end = isBefore(now, parseISO(customer.contractEnd)) ? now : parseISO(customer.contractEnd)
   const visits: ServiceVisit[] = []

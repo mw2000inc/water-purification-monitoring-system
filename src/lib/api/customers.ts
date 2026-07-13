@@ -73,7 +73,9 @@ export async function getCustomer(id: string): Promise<Customer | undefined> {
 }
 
 export async function createCustomer(
-  input: Omit<Customer, "id" | "createdAt" | "orderNumber">,
+  // contractNumber is optional on create — the DB auto-fills it from order_number
+  // if omitted (see the set_customer_order_number trigger).
+  input: Omit<Customer, "id" | "createdAt" | "orderNumber" | "contractNumber"> & { contractNumber?: string },
   actorId: string
 ): Promise<Customer> {
   const { data, error } = await supabase.from("customers").insert(toRow(input)).select().single()

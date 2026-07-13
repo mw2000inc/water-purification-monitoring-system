@@ -52,6 +52,14 @@ export interface SaleItem {
   subtotal: number
 }
 
+export interface SaleService {
+  id: string
+  name: string
+  quantity: number
+  unitPrice: number
+  subtotal: number
+}
+
 export interface Sale {
   id: string
   invoiceNumber: string
@@ -59,6 +67,7 @@ export interface Sale {
   customerId: string
   salesRepId: string
   items: SaleItem[]
+  services: SaleService[]
   discount: number
   totalAmount: number
   paymentMethod: PaymentMethod

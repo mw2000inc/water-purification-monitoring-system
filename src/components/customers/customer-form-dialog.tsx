@@ -40,7 +40,6 @@ const schema = z
   .object({
     fullName: z.string().min(2, "Full name is required"),
     companyName: z.string().optional(),
-    contractNumber: z.string().min(2, "Contract number is required"),
     contractStart: z.string().min(1, "Start date is required"),
     contractEnd: z.string().min(1, "End date is required"),
     address: z.string().min(5, "Address is required"),
@@ -62,7 +61,6 @@ function defaultValues(customer?: Customer): FormValues {
   return {
     fullName: customer?.fullName ?? "",
     companyName: customer?.companyName ?? "",
-    contractNumber: customer?.contractNumber ?? "",
     contractStart: customer?.contractStart ?? new Date().toISOString().slice(0, 10),
     contractEnd: customer?.contractEnd ?? "",
     address: customer?.address ?? "",
@@ -115,7 +113,10 @@ export function CustomerFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+      <DialogContent
+        className="sm:max-w-2xl max-h-[85vh] overflow-y-auto"
+        onInteractOutside={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle>{isEdit ? "Edit Customer" : "Add Customer"}</DialogTitle>
           <DialogDescription>
@@ -185,19 +186,6 @@ export function CustomerFormDialog({
                     <FormLabel>Address</FormLabel>
                     <FormControl>
                       <Input placeholder="123 Main St., Quezon City" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="contractNumber"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Contract Number</FormLabel>
-                    <FormControl>
-                      <Input placeholder="CN-2026-1001" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
