@@ -36,14 +36,18 @@ export default function CustomersPage() {
   const [deleting, setDeleting] = React.useState<Customer | undefined>(undefined)
   const [filteredRows, setFilteredRows] = React.useState<CustomerRow[]>([])
 
+  // The Shopify placeholder customer is a bookkeeping artifact (billed on
+  // Shopify-origin sales), not a real contract customer — hide it here.
+  const realCustomers = React.useMemo(() => customers.filter((c) => !c.isSystem), [customers])
+
   const rows: CustomerRow[] = React.useMemo(
-    () => customers.map((c) => ({ ...c, contractStatus: getContractStatus(c.contractEnd) })),
-    [customers]
+    () => realCustomers.map((c) => ({ ...c, contractStatus: getContractStatus(c.contractEnd) })),
+    [realCustomers]
   )
 
   const years = React.useMemo(
-    () => Array.from(new Set(customers.map((c) => parseISO(c.createdAt).getFullYear()))).sort((a, b) => b - a),
-    [customers]
+    () => Array.from(new Set(realCustomers.map((c) => parseISO(c.createdAt).getFullYear()))).sort((a, b) => b - a),
+    [realCustomers]
   )
 
   const scopedRows = React.useMemo(() => {

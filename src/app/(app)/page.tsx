@@ -60,9 +60,14 @@ export default function DashboardPage() {
     )
   }
 
-  const summary = dashboardSummary(customers, contracts, sales, products)
+  // The Shopify placeholder customer isn't a real install contract — exclude it
+  // from customer/contract counts, but Shopify-origin sales still count toward
+  // revenue below (that's the whole point of tracking them).
+  const realCustomers = customers.filter((c) => !c.isSystem)
+  const realContracts = contracts.filter((c) => !customers.find((cust) => cust.id === c.customerId)?.isSystem)
+  const summary = dashboardSummary(realCustomers, realContracts, sales, products)
   const monthly = monthlySalesSeries(sales)
-  const registrations = customerRegistrationSeries(customers)
+  const registrations = customerRegistrationSeries(realCustomers)
   const movementSeries = inventoryMovementSeries(movements)
   const topProducts = topSellingProducts(sales, products)
 

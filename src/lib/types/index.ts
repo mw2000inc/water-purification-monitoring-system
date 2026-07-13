@@ -29,6 +29,10 @@ export interface Customer {
   assignedTechnician: string
   notes?: string
   createdAt: string
+  // True for the auto-created placeholder customer that Shopify-origin sales
+  // are billed to — not a real installed-unit contract, excluded from
+  // Customers/Contracts/Dashboard views.
+  isSystem?: boolean
 }
 
 export type MonitoringStatus = "active" | "for-replacement"
@@ -72,6 +76,10 @@ export interface Sale {
   totalAmount: number
   paymentMethod: PaymentMethod
   paymentStatus: PaymentStatus
+  // Present only for sales auto-created by the Shopify order webhook — also
+  // doubles as the idempotency key that prevents double-processing a
+  // redelivered webhook.
+  shopifyOrderId?: string
 }
 
 export type StockStatus = "in-stock" | "low-stock" | "out-of-stock"

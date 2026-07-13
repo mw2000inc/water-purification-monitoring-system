@@ -26,36 +26,40 @@ export default function ContractsPage() {
   const isPending = p1 || p2
 
   const rows: ContractRow[] = React.useMemo(() => {
-    return contracts.map((c) => {
-      const customer = customers.find((cust) => cust.id === c.customerId)
-      // Quarterly checkpoints are counted from when the unit was actually installed,
-      // not the paperwork/contract start — falls back to contract start for customers
-      // who don't have an installed date on file yet.
-      const anchor = customer?.installedDate ?? c.startDate
-      // The current quarterly cycle: the 3-month checkpoint is the next one on/after
-      // today, start is exactly 3 months before that — every checkpoint from there on
-      // (3/6/9 months) stays exactly 3 months apart from the last.
-      const periodEnd = getNextQuarterlyDate(anchor)
-      const periodStart = subMonths(periodEnd, 3)
-      const threeMonthDate = format(periodEnd, "yyyy-MM-dd")
-      const sixMonthDate = format(addMonths(periodEnd, 3), "yyyy-MM-dd")
-      const nineMonthDate = format(addMonths(periodEnd, 6), "yyyy-MM-dd")
-      const startDate = format(periodStart, "yyyy-MM-dd")
-      // The cycle isn't done until the final (9-month) checkpoint has passed.
-      const daysRemaining = daysUntil(nineMonthDate)
-      return {
-        ...c,
-        startDate,
-        orderNumber: customer?.orderNumber ?? "N/A",
-        customerName: customer?.fullName ?? "Unknown",
-        companyName: customer?.companyName,
-        threeMonthDate,
-        sixMonthDate,
-        nineMonthDate,
-        // Automatically flips once the final checkpoint has arrived (or passed) today.
-        status: daysRemaining <= 0 ? "for-replacement" : "active",
-      }
-    })
+    return contracts
+      // The Shopify placeholder customer has no real installed unit, so it has
+      // no meaningful quarterly-maintenance cycle — exclude it here.
+      .filter((c) => !customers.find((cust) => cust.id === c.customerId)?.isSystem)
+      .map((c) => {
+        const customer = customers.find((cust) => cust.id === c.customerId)
+        // Quarterly checkpoints are counted from when the unit was actually installed,
+        // not the paperwork/contract start — falls back to contract start for customers
+        // who don't have an installed date on file yet.
+        const anchor = customer?.installedDate ?? c.startDate
+        // The current quarterly cycle: the 3-month checkpoint is the next one on/after
+        // today, start is exactly 3 months before that — every checkpoint from there on
+        // (3/6/9 months) stays exactly 3 months apart from the last.
+        const periodEnd = getNextQuarterlyDate(anchor)
+        const periodStart = subMonths(periodEnd, 3)
+        const threeMonthDate = format(periodEnd, "yyyy-MM-dd")
+        const sixMonthDate = format(addMonths(periodEnd, 3), "yyyy-MM-dd")
+        const nineMonthDate = format(addMonths(periodEnd, 6), "yyyy-MM-dd")
+        const startDate = format(periodStart, "yyyy-MM-dd")
+        // The cycle isn't done until the final (9-month) checkpoint has passed.
+        const daysRemaining = daysUntil(nineMonthDate)
+        return {
+          ...c,
+          startDate,
+          orderNumber: customer?.orderNumber ?? "N/A",
+          customerName: customer?.fullName ?? "Unknown",
+          companyName: customer?.companyName,
+          threeMonthDate,
+          sixMonthDate,
+          nineMonthDate,
+          // Automatically flips once the final checkpoint has arrived (or passed) today.
+          status: daysRemaining <= 0 ? "for-replacement" : "active",
+        }
+      })
   }, [contracts, customers])
 
   const counts = React.useMemo(

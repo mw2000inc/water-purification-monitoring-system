@@ -28,6 +28,7 @@ type SaleRow = {
   total_amount: number
   payment_method: string
   payment_status: string
+  shopify_order_id: string | null
   sale_items: SaleItemRow[]
   sale_services: SaleServiceRow[]
 }
@@ -65,6 +66,7 @@ function fromRow(row: SaleRow): Sale {
     totalAmount: Number(row.total_amount),
     paymentMethod: row.payment_method as Sale["paymentMethod"],
     paymentStatus: row.payment_status as Sale["paymentStatus"],
+    shopifyOrderId: row.shopify_order_id ?? undefined,
   }
 }
 

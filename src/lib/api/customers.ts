@@ -19,6 +19,7 @@ type CustomerRow = {
   assigned_technician: string
   notes: string | null
   created_at: string
+  is_system: boolean
 }
 
 function fromRow(row: CustomerRow): Customer {
@@ -39,6 +40,7 @@ function fromRow(row: CustomerRow): Customer {
     assignedTechnician: row.assigned_technician,
     notes: row.notes ?? undefined,
     createdAt: row.created_at,
+    isSystem: row.is_system,
   }
 }
 
