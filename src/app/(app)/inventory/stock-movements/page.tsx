@@ -241,12 +241,22 @@ export default function StockMovementsPage() {
         open={!!deleting}
         onOpenChange={(o) => !o && setDeleting(undefined)}
         title="Delete stock movement?"
-        description={`This will permanently remove this movement and adjust ${deleting?.productName ?? "the product"}'s stock accordingly.`}
+        description={
+          deleting?.reason === "Sale"
+            ? `This movement was auto-generated from a sale. Deleting it will adjust ${deleting?.productName ?? "the product"}'s stock but won't change the original invoice.`
+            : `This will permanently remove this movement and adjust ${deleting?.productName ?? "the product"}'s stock accordingly.`
+        }
         loading={deleteMovement.isPending}
         onConfirm={async () => {
           if (!deleting) return
-          await deleteMovement.mutateAsync(deleting.id)
-          setDeleting(undefined)
+          // The mutation's onError already toasts the reason — catch here so that
+          // rejection doesn't also surface as an unhandled-error dev overlay.
+          try {
+            await deleteMovement.mutateAsync(deleting.id)
+            setDeleting(undefined)
+          } catch {
+            // handled by the mutation's onError toast
+          }
         }}
       />
     </div>

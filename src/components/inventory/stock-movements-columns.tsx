@@ -112,32 +112,27 @@ export function getStockMovementsColumns({
     columns.push({
       id: "actions",
       header: "",
-      cell: ({ row }) => {
-        // Auto-generated from a real sale — editing/deleting it independently would
-        // desync the stock ledger from that invoice, so it's not touched here.
-        if (row.original.reason === "Sale") return null
-        return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {canEdit && (
-                <DropdownMenuItem onClick={() => onEdit(row.original)}>
-                  <Pencil className="h-4 w-4" /> Edit
-                </DropdownMenuItem>
-              )}
-              {canDelete && (
-                <DropdownMenuItem variant="destructive" onClick={() => onDelete(row.original)}>
-                  <Trash2 className="h-4 w-4" /> Delete
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )
-      },
+      cell: ({ row }) => (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8">
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {canEdit && (
+              <DropdownMenuItem onClick={() => onEdit(row.original)}>
+                <Pencil className="h-4 w-4" /> Edit
+              </DropdownMenuItem>
+            )}
+            {canDelete && (
+              <DropdownMenuItem variant="destructive" onClick={() => onDelete(row.original)}>
+                <Trash2 className="h-4 w-4" /> Delete
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ),
     })
   }
 

@@ -207,8 +207,15 @@ export default function InventoryPage() {
         loading={deleteProduct.isPending}
         onConfirm={async () => {
           if (!deleting) return
-          await deleteProduct.mutateAsync(deleting.id)
-          setDeleting(undefined)
+          // The mutation's onError already toasts the reason (e.g. a product still
+          // referenced by a past sale) — catch here so that rejection doesn't also
+          // surface as an unhandled-error dev overlay on top of the toast.
+          try {
+            await deleteProduct.mutateAsync(deleting.id)
+            setDeleting(undefined)
+          } catch {
+            // handled by the mutation's onError toast
+          }
         }}
       />
     </div>

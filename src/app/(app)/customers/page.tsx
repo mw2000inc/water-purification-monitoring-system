@@ -160,8 +160,14 @@ export default function CustomersPage() {
         loading={deleteCustomer.isPending}
         onConfirm={async () => {
           if (!deleting) return
-          await deleteCustomer.mutateAsync(deleting.id)
-          setDeleting(undefined)
+          // The mutation's onError already toasts the reason — catch here so that
+          // rejection doesn't also surface as an unhandled-error dev overlay.
+          try {
+            await deleteCustomer.mutateAsync(deleting.id)
+            setDeleting(undefined)
+          } catch {
+            // handled by the mutation's onError toast
+          }
         }}
       />
     </div>
