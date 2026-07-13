@@ -43,7 +43,9 @@ export async function GET() {
   const redirectUri = `${appUrl}/api/shopify/callback`
   const authorizeUrl = shopifyAuthorizeUrl({ shop, clientId, redirectUri, state })
 
-  const response = NextResponse.redirect(authorizeUrl)
+  // Explicit 302 (NextResponse.redirect defaults to 307) — some OAuth/cookie
+  // edge cases behave more predictably with a classic temporary redirect.
+  const response = NextResponse.redirect(authorizeUrl, { status: 302 })
   response.cookies.set(STATE_COOKIE, state, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
