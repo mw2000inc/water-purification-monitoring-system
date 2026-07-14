@@ -164,7 +164,6 @@ export default function CustomerProfilePage() {
                           {t}
                         </SelectItem>
                       ))}
-                      <SelectItem value={TECHNICIAN_NA}>N/A</SelectItem>
                     </SelectContent>
                   </Select>
                   <Button
