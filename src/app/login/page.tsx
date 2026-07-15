@@ -51,6 +51,17 @@ export default function LoginPage() {
     if (!loading && user) router.replace("/")
   }, [loading, user, router])
 
+  // /auth/callback bounces back here with ?oauth_error=1 if the Google code
+  // exchange failed (e.g. an expired/reused code) — surface it once, then
+  // scrub the URL so refreshing doesn't re-show the toast.
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get("oauth_error")) {
+      toast.error("Google sign-in didn't complete — please try again.")
+      window.history.replaceState(null, "", window.location.pathname)
+    }
+  }, [])
+
   const signInForm = useForm<z.infer<typeof signInSchema>>({
     resolver: zodResolver(signInSchema),
     defaultValues: { email: "", password: "" },
@@ -91,13 +102,13 @@ export default function LoginPage() {
   }
 
   async function handleGoogleSignIn() {
-    // Redirects the browser to Google's own account chooser/consent screen —
-    // Supabase exchanges the result for a session once Google sends the
-    // admin back to /login, where the existing "user is set -> redirect to /"
-    // effect above takes it from there.
+    // Redirects the browser to Google's own account chooser/consent screen.
+    // Google sends the admin back to /auth/callback (not straight to /login)
+    // — that route exchanges the one-time code for a session server-side,
+    // then redirects to "/", where the app's own auth guard takes over.
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: `${window.location.origin}/login` },
+      options: { redirectTo: `${window.location.origin}/auth/callback` },
     })
     if (error) toast.error(error.message)
   }
