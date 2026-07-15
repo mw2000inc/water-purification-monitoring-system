@@ -6,10 +6,12 @@ import { z } from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm, Controller } from "react-hook-form"
 import { toast } from "sonner"
-import { ShieldCheck, UserRound, Eye, EyeOff } from "lucide-react"
+import { ShieldCheck, UserRound } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Logo } from "@/components/shared/logo"
+import { GoogleIcon } from "@/components/shared/google-icon"
+import { PasswordInput } from "@/components/shared/password-input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -39,35 +41,11 @@ type Mode = "signin" | "signup"
 
 const REMEMBERED_EMAIL_KEY = "mw2000-remembered-email"
 
-const PasswordInput = React.forwardRef<HTMLInputElement, React.ComponentProps<typeof Input>>(
-  function PasswordInput({ className, ...props }, ref) {
-    const [visible, setVisible] = React.useState(false)
-    return (
-      <div className="relative">
-        <Input
-          ref={ref}
-          type={visible ? "text" : "password"}
-          className={cn("pr-9", className)}
-          {...props}
-        />
-        <button
-          type="button"
-          tabIndex={-1}
-          onClick={() => setVisible((v) => !v)}
-          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-          aria-label={visible ? "Hide password" : "Show password"}
-        >
-          {visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-        </button>
-      </div>
-    )
-  }
-)
-
 export default function LoginPage() {
   const { user, loading } = useAuth()
   const router = useRouter()
-  const [mode, setMode] = React.useState<Mode>("signup")
+  const [mode, setMode] = React.useState<Mode>("signin")
+  const [resetPending, setResetPending] = React.useState(false)
 
   React.useEffect(() => {
     if (!loading && user) router.replace("/")
@@ -110,6 +88,36 @@ export default function LoginPage() {
     }
     // AuthProvider's onAuthStateChange listener picks up the new session, which
     // updates `user` above and triggers the redirect effect.
+  }
+
+  async function handleGoogleSignIn() {
+    // Redirects the browser to Google's own account chooser/consent screen —
+    // Supabase exchanges the result for a session once Google sends the
+    // admin back to /login, where the existing "user is set -> redirect to /"
+    // effect above takes it from there.
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: `${window.location.origin}/login` },
+    })
+    if (error) toast.error(error.message)
+  }
+
+  async function handleForgotPassword() {
+    const email = signInForm.getValues("email").trim()
+    if (!email) {
+      signInForm.setError("email", { message: "Enter your email first, then click \"Forgot password?\"" })
+      return
+    }
+    setResetPending(true)
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    })
+    setResetPending(false)
+    if (error) {
+      toast.error(error.message)
+      return
+    }
+    toast.success("Password reset link sent — check your email.")
   }
 
   async function onSignUp(values: z.infer<typeof signUpSchema>) {
@@ -159,9 +167,10 @@ export default function LoginPage() {
           </CardHeader>
           <CardContent className="space-y-5">
             {mode === "signin" ? (
-              // Plain uncontrolled inputs (via register(), not Controller's value/onChange binding) —
-              // some browser/extension combinations fight a *controlled* value on login-shaped fields,
-              // silently reverting typed text. Letting the DOM own the value sidesteps that entirely.
+              <>
+              {/* Plain uncontrolled inputs (via register(), not Controller's value/onChange binding) —
+                  some browser/extension combinations fight a *controlled* value on login-shaped fields,
+                  silently reverting typed text. Letting the DOM own the value sidesteps that entirely. */}
               <form onSubmit={signInForm.handleSubmit(onSignIn)} className="space-y-4">
                 <div className="grid gap-2">
                   <Label>Email</Label>
@@ -183,14 +192,37 @@ export default function LoginPage() {
                   />
                   {signInPasswordError && <p className="text-destructive text-sm">{signInPasswordError}</p>}
                 </div>
-                <label className="flex items-center gap-2 text-sm cursor-pointer">
-                  <Checkbox checked={rememberMe} onCheckedChange={(v) => setRememberMe(v === true)} />
-                  Remember me
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <Checkbox checked={rememberMe} onCheckedChange={(v) => setRememberMe(v === true)} />
+                    Remember me
+                  </label>
+                  <button
+                    type="button"
+                    className="text-sm text-primary hover:underline disabled:opacity-50"
+                    disabled={resetPending}
+                    onClick={handleForgotPassword}
+                  >
+                    {resetPending ? "Sending..." : "Forgot password?"}
+                  </button>
+                </div>
                 <Button type="submit" className="w-full" disabled={signInForm.formState.isSubmitting}>
                   Sign in
                 </Button>
               </form>
+              <div className="relative py-1">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-card px-2 text-muted-foreground">Or</span>
+                </div>
+              </div>
+              <Button type="button" variant="outline" className="w-full gap-2" onClick={handleGoogleSignIn}>
+                <GoogleIcon className="h-4 w-4" />
+                Sign in with Google
+              </Button>
+              </>
             ) : (
               <form onSubmit={signUpForm.handleSubmit(onSignUp)} className="space-y-4">
                 <div className="grid gap-2">
