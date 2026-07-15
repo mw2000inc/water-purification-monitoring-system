@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { exchangeCodeForAccessToken, registerOrderCreateWebhook, verifyOAuthCallbackHmac } from "@/lib/shopify"
+import { exchangeCodeForAccessToken, registerWebhook, verifyOAuthCallbackHmac } from "@/lib/shopify"
 
 const STATE_COOKIE = "shopify_oauth_state"
 
@@ -104,11 +104,21 @@ export async function GET(request: Request) {
 
   // Best-effort — the connection itself is already saved even if this fails
   // (e.g. a webhook for this topic already exists from a previous install).
+  // orders/create captures new orders; orders/updated is what lets a COD
+  // order's payment status (or any other order edit) sync into MW2000 after
+  // the fact, since Shopify never re-fires orders/create for the same order.
   try {
-    await registerOrderCreateWebhook({
+    await registerWebhook({
       shop,
       accessToken,
+      topic: "orders/create",
       callbackUrl: `${appUrl}/api/webhooks/shopify/orders-create`,
+    })
+    await registerWebhook({
+      shop,
+      accessToken,
+      topic: "orders/updated",
+      callbackUrl: `${appUrl}/api/webhooks/shopify/orders-updated`,
     })
   } catch (err) {
     return redirectToSettings(

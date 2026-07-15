@@ -1,5 +1,6 @@
 import "server-only"
 import crypto from "node:crypto"
+import type { PaymentMethod, PaymentStatus } from "@/lib/types"
 
 // Read access to orders (for the webhook payload) and products (in case we ever
 // need to cross-check against Shopify's own catalog) — kept minimal on purpose,
@@ -100,19 +101,21 @@ function timingSafeEqualEncoded(a: string, b: string, encoding: "hex" | "base64"
   return crypto.timingSafeEqual(bufA, bufB)
 }
 
-export async function registerOrderCreateWebhook({
+export async function registerWebhook({
   shop,
   accessToken,
+  topic,
   callbackUrl,
 }: {
   shop: string
   accessToken: string
+  topic: string
   callbackUrl: string
 }): Promise<void> {
   const res = await fetch(`https://${shop}/admin/api/${API_VERSION}/webhooks.json`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-Shopify-Access-Token": accessToken },
-    body: JSON.stringify({ webhook: { topic: "orders/create", address: callbackUrl, format: "json" } }),
+    body: JSON.stringify({ webhook: { topic, address: callbackUrl, format: "json" } }),
   })
   if (!res.ok) {
     // A 422 here usually means a webhook for this topic+address already
@@ -120,15 +123,37 @@ export async function registerOrderCreateWebhook({
     // just surface it for the callback route to log.
     const body = await res.text()
     if (res.status !== 422) {
-      throw new Error(`Failed to register Shopify order webhook (${res.status}): ${body}`)
+      throw new Error(`Failed to register Shopify ${topic} webhook (${res.status}): ${body}`)
     }
   }
 }
+
+// Maps Shopify's financial_status to MW2000's fixed PaymentStatus enum, which
+// has no direct equivalent for every Shopify state (e.g. refunded/voided) —
+// those fall back to Pending as a known simplification.
+export function mapShopifyPaymentStatus(financialStatus: string): PaymentStatus {
+  if (financialStatus === "paid") return "Paid"
+  if (financialStatus === "partially_paid") return "Partial"
+  return "Pending"
+}
+
+// Shopify orders don't carry a payment method that maps cleanly onto this
+// app's fixed enum (Cash/Bank Transfer/Credit Card/GCash/Check) — Shopify
+// Payments/checkout card payments are by far the common case, so that's the
+// default for every order regardless of the actual gateway used (including
+// Cash on Delivery, which Shopify itself tracks via financial_status/gateway
+// rather than a distinct "payment method" MW2000 has an enum value for).
+export const SHOPIFY_PAYMENT_METHOD: PaymentMethod = "Credit Card"
 
 export interface ShopifyLineItem {
   sku: string | null
   quantity: number
   price: string
+  // The discount amount allocated to this specific line (already accounts
+  // for both line-level and order-level discount codes Shopify allocates
+  // proportionally) — subtract this to get what the customer actually paid
+  // for the line, since `price` alone is the pre-discount unit price.
+  total_discount: string
   title: string
 }
 

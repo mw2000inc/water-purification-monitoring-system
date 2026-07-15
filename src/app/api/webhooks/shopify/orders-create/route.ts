@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { verifyWebhookHmac, type ShopifyOrder } from "@/lib/shopify"
-import type { PaymentMethod, PaymentStatus } from "@/lib/types"
+import {
+  mapShopifyPaymentStatus,
+  verifyWebhookHmac,
+  SHOPIFY_PAYMENT_METHOD,
+  type ShopifyOrder,
+} from "@/lib/shopify"
 
 type AdminClient = ReturnType<typeof createAdminClient>
 
@@ -83,21 +87,6 @@ async function resolveBuyerCustomerId(admin: AdminClient, order: ShopifyOrder): 
   return created.id
 }
 
-function mapPaymentStatus(financialStatus: string): PaymentStatus {
-  if (financialStatus === "paid") return "Paid"
-  if (financialStatus === "partially_paid") return "Partial"
-  // pending / authorized / refunded / voided / partially_refunded all fall
-  // back to Pending — MW2000's PaymentStatus enum has no direct equivalent
-  // for a refunded/voided order, this is a known simplification.
-  return "Pending"
-}
-
-// Shopify orders don't carry a payment method that maps cleanly onto this
-// app's fixed enum (Cash/Bank Transfer/Credit Card/GCash/Check) — Shopify
-// Payments/checkout card payments are by far the common case, so that's
-// the default for every order regardless of the actual gateway used.
-const SHOPIFY_PAYMENT_METHOD: PaymentMethod = "Credit Card"
-
 export async function POST(request: Request) {
   const clientSecret = process.env.SHOPIFY_CLIENT_SECRET
   const expectedShop = process.env.SHOPIFY_SHOP_DOMAIN
@@ -159,13 +148,19 @@ export async function POST(request: Request) {
       unmatchedSkus.push(sku)
       continue
     }
-    const unitPrice = Number(item.price) || 0
+    // item.price is Shopify's PRE-discount unit price — subtract this line's
+    // own allocated discount to get what the customer actually paid for it,
+    // not the product's list price.
+    const grossPrice = Number(item.price) || 0
+    const lineDiscount = Number(item.total_discount) || 0
+    const subtotal = Math.max(grossPrice * item.quantity - lineDiscount, 0)
+    const unitPrice = item.quantity > 0 ? subtotal / item.quantity : grossPrice
     matched.push({
       productId: product.id,
       sku,
       quantity: item.quantity,
       unitPrice,
-      subtotal: unitPrice * item.quantity,
+      subtotal,
     })
   }
 
@@ -198,11 +193,10 @@ export async function POST(request: Request) {
     )
   }
 
+  // Each matched item's subtotal above is already net of its own line-item
+  // discount, so the discount is already fully baked into grossOfMatched —
+  // no separate order-level subtraction here, or it would double-count.
   const grossOfMatched = matched.reduce((sum, m) => sum + m.subtotal, 0)
-  // Discount is applied at the order level in Shopify but only to the portion
-  // of the order this app could actually match to a product — a reasonable
-  // simplification when an order is only partially matched.
-  const discount = Math.min(Number(order.total_discounts) || 0, grossOfMatched)
 
   const { data: sale, error: saleError } = await admin
     .from("sales")
@@ -210,10 +204,10 @@ export async function POST(request: Request) {
       date: order.created_at.slice(0, 10),
       customer_id: customerId,
       sales_rep_id: settings.system_profile_id,
-      discount,
-      total_amount: grossOfMatched - discount,
+      discount: 0,
+      total_amount: grossOfMatched,
       payment_method: SHOPIFY_PAYMENT_METHOD,
-      payment_status: mapPaymentStatus(order.financial_status),
+      payment_status: mapShopifyPaymentStatus(order.financial_status),
       shopify_order_id: shopifyOrderId,
     })
     .select("id")
