@@ -141,6 +141,7 @@ export type NotificationType =
   | "expiring-contract"
   | "new-customer"
   | "new-sale"
+  | "shopify-sku-not-found"
 
 export interface AppNotification {
   id: string
